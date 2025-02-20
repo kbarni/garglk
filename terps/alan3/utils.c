@@ -47,6 +47,21 @@ void printVersion(int buildNumber) {
     printf("Arun - Adventure Language Interpreter version %s", alan.version.string);
     if (buildNumber != 0) printf("-%d", buildNumber);
     printf(" (%s %s)", alan.date, alan.time);
+#ifdef GIT_VERSION
+    printf("\nBuilt from git %s", GIT_VERSION);
+#endif
+
+}
+
+/*======================================================================*/
+void printIFIDs(char *adventureName) {
+    IfidEntry *ifidEntry;
+
+    printf("'%s' contains the following IFIDs:\n", adventureName);
+    for (ifidEntry = pointerTo(header->ifids); !isEndOfArray(ifidEntry); ifidEntry++) {
+        printf("  %s:\t%s\n", (unsigned char *)pointerTo(ifidEntry->nameAddress),
+               (unsigned char *)pointerTo(ifidEntry->valueAddress));
+    }
 }
 
 
@@ -64,14 +79,19 @@ void usage(char *programName)
 #ifdef HAVE_GLK
     glk_set_style(style_Preformatted);
 #endif
-    printf("    -v       verbose mode\n");
-    printf("    -l       log transcript to a file\n");
-    printf("    -c       log player commands to a file\n");
-    printf("    -n       no Status Line\n");
-    printf("    -d       enter debug mode\n");
-    printf("    -t[<n>]  trace game execution, higher <n> gives more trace\n");
-    printf("    -i       ignore version and checksum errors\n");
-    printf("    -r       make regression test easier (don't timestamp, page break, randomize...)\n");
+    printf("    -u        use UTF-8 encoding for input and output\n");
+    printf("    -i        use ISO8859-1 encoding for input and output\n");
+    printf("    -h        this help\n");
+    printf("    -v        verbose mode\n");
+    printf("    -l        log game transcript to a file ('.a3t')\n");
+    printf("    -c        log player command input (the solution) to a file ('.a3s')\n");
+    printf("    -n        don't show the Status Line\n");
+    printf("    -p        don't page output\n");
+    printf("    -d        enter debug mode immediately\n");
+    printf("    -t[<n>]   trace game execution, higher <n> gives more trace\n");
+    printf("    -r        make regression testing easier (don't timestamp, page break, randomize...)\n");
+    printf("    -e        ignore version and checksum errors (dangerous)\n");
+    printf("    --version print version and exit\n");
 #ifdef HAVE_GLK
     glk_set_style(style_Normal);
 #endif

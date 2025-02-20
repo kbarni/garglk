@@ -45,14 +45,14 @@ if $(KINDLE)
 
     OS      = LINUX ;
     SUFEXE  = ;
-    CC      = arm-unknown-linux-gnueabi-gcc ;
-    CXX     = arm-unknown-linux-gnueabi-g++ ;
-    C++     = arm-unknown-linux-gnueabi-g++ ;
-    #AR     = arm-unknown-linux-gnueabi-ar cru ;
-    AR      = arm-unknown-linux-gnueabi-gcc-ar cru ;
-    RANLIB  = arm-unknown-linux-gnueabi-gcc-ranlib ;
-    LINK    = arm-unknown-linux-gnueabi-gcc ;
-    LD      = arm-unknown-linux-gnueabi-ld ;
+#    CC      = arm-linux-gnueabihf-gcc ;
+#    CXX     = arm-linux-gnueabihf-g++ ;
+#    C++     = arm-linux-gnueabihf-g++ ;
+#    #AR     = arm-linux-gnueabihf-ar cru ;
+#    AR      = arm-linux-gnueabihf-gcc-ar cru ;
+#    RANLIB  = arm-linux-gnueabihf-gcc-ranlib ;
+#    LINK    = arm-linux-gnueabihf-gcc ;
+#    LD      = arm-unknown-linux-gnueabi-ld ;
 }
 
 #cross compiling for Open Inkpot
@@ -158,8 +158,8 @@ switch $(PLATFORM)
         if $(KINDLE)
         {
             GARGLKCCFLAGS += -D_KINDLE -D_ALT_MOUSE_HANDLING ;
-            GARGLKLIBS += -lstdc++ ;
-            LINKLIBS += -lstdc++ ;
+            GARGLKLIBS += -lstdc++ -llipc ;
+            LINKLIBS += -lstdc++ -llipc ;
         }
 
         if $(STATIC) { LINKLIBS += $(GARGLKLIBS) ; }

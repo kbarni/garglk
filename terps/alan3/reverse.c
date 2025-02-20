@@ -32,12 +32,12 @@ static bool alreadyDone(Aaddr address)
 {
     int i;
 
-    if (address == 0) return TRUE;
+    if (address == 0) return true;
 
     /* Have we already done it? */
     for (i = 0; i < numberDone; i++)
         if (addressesDone[i] == address)
-            return TRUE;
+            return true;
 
     if (doneSize == numberDone) {
         doneSize += 100;
@@ -46,7 +46,7 @@ static bool alreadyDone(Aaddr address)
     addressesDone[numberDone] = address;
     numberDone++;
 
-    return FALSE;
+    return false;
 }
 
 
@@ -91,18 +91,18 @@ void reverse(Aword *w)          /* IN - The ACODE word to reverse bytes in */
 }
 
 
-static void reverseTable(Aword adr, int elementSize)
+static void reverseTable(Aword adr, int elementSizeInBytes)
 {
   Aword *e = &memory[adr];
   int i;
 
-  if (elementSize < sizeof(Aword) || elementSize % sizeof(Aword) != 0)
+  if (elementSizeInBytes < sizeof(Aword) || elementSizeInBytes % sizeof(Aword) != 0)
       syserr("***Wrong size in 'reverseTable()' ***");
 
   if (adr == 0) return;
 
   while (!isEndOfArray(e)) {
-    for (i = 0; i < elementSize/sizeof(Aword); i++) {
+    for (i = 0; i < elementSizeInBytes/sizeof(Aword); i++) {
       reverse(e);
       e++;
     }
@@ -116,7 +116,7 @@ static void reverseStms(Aword adr)
 
   if (!adr || alreadyDone(adr)) return;
 
-  while (TRUE) {
+  while (true) {
     reverse(e);
     if (*e == ((Aword)C_STMOP<<28|(Aword)I_RETURN)) break;
     e++;
@@ -387,13 +387,13 @@ static void reverseSyntaxTable(Aword adr, char version[])
 static void reverseParameterNames(Aaddr parameterMapAddress) {
     Aaddr *e;
     Aaddr adr;
-    
+
     adr = addressAfterTable(parameterMapAddress, sizeof(ParameterMapEntry));
     reverse(&memory[adr]);
     adr = memory[adr];
-    
+
     reverseTable(adr, sizeof(Aaddr));
-    
+
     e = (Aaddr*) &memory[adr];
     while (!isEndOfArray(e)) {
         reverseTable(*e, sizeof(Aaddr));
@@ -503,6 +503,10 @@ static void reverseSetInitTable(Aaddr adr)
 }
 
 
+static void reverseIfids(Aaddr adr) {
+    reverseTable(adr, sizeof(IfidEntry));
+}
+
 
 /*----------------------------------------------------------------------*/
 static void reversePreAlpha5Header(Pre3_0alpha5Header *hdr)
@@ -604,7 +608,7 @@ static void reverseInstanceIdTable(ACodeHeader *header) {
 
 
 /*----------------------------------------------------------------------*/
-static void reverseNative() {
+static void reverseNative(char version[]) {
     /* NOTE that the reversePreXXX() have different header definitions */
     ACodeHeader *header = (ACodeHeader *)memory;
 
@@ -632,6 +636,9 @@ static void reverseNative() {
     reverseStms(header->prompt);
     reverseStms(header->start);
     reverseMsgs(header->messageTableAddress);
+    if (!isPreBeta7(version))
+        /* We can't find the IFID:s in pre-beta7 because of a bug in compiler */
+        reverseIfids(header->ifids);
 
     reverseTable(header->scores, sizeof(Aword));
     reverseTable(header->freq, sizeof(Aword));
@@ -663,7 +670,7 @@ void reverseACD(void)
   else if (isPreBeta2(version))
       reversePreBeta2();
   else
-      reverseNative();
+      reverseNative(version);
 
   free(addressesDone);
 }

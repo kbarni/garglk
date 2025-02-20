@@ -46,7 +46,7 @@ static const char * DirSeparator = "/";
 
 char dir[MaxBuffer];
 char buf[MaxBuffer];
-char tmp[MaxBuffer];
+char tmp1[MaxBuffer];
 
 struct filter
 {
@@ -305,7 +305,7 @@ int winexec(const char *cmd, char **args)
 
 int winterp(char *path, char *exe, char *flags, char *game)
 {
-    sprintf(tmp, LaunchingTemplate, path, exe);
+    sprintf(tmp1, LaunchingTemplate, path, exe);
 
     setenv("GARGLK_INI", path, FALSE);
 
@@ -323,7 +323,7 @@ int winterp(char *path, char *exe, char *flags, char *game)
         args[1] = buf;
     }
 
-    if (!winexec(tmp, args))
+    if (!winexec(tmp1, args))
     {
         winmsg("Could not start 'terp.\nSorry.");
         return FALSE;

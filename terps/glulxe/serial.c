@@ -63,10 +63,14 @@ static int reposition_write(dest_t *dest, glui32 pos);
 int init_serial()
 {
   undo_chain_num = 0;
-  undo_chain_size = max_undo_level;
-  undo_chain = (unsigned char **)glulx_malloc(sizeof(unsigned char *) * undo_chain_size);
-  if (!undo_chain)
-    return FALSE;
+  undo_chain_size = 0;
+  undo_chain = NULL;
+  if (max_undo_level > 0) {
+    undo_chain_size = max_undo_level;
+    undo_chain = (unsigned char **)glulx_malloc(sizeof(unsigned char *) * undo_chain_size);
+    if (!undo_chain)
+      return FALSE;
+  }
 
 #ifdef SERIALIZE_CACHE_RAM
   {
@@ -117,7 +121,7 @@ glui32 perform_saveundo()
 {
   dest_t dest;
   glui32 res;
-  glui32 memstart, memlen, heapstart, heaplen, stackstart, stacklen;
+  glui32 memstart=0, memlen=0, heapstart=0, heaplen=0, stackstart=0, stacklen=0;
 
   /* The format for undo-saves is simpler than for saves on disk. We
      just have a memory chunk, a heap chunk, and a stack chunk, in
@@ -238,6 +242,7 @@ glui32 perform_restoreundo()
   dest.ptr = undo_chain[0];
   dest.str = NULL;
 
+  val = 0;
   res = 0;
   if (res == 0) {
     res = read_long(&dest, &val);
@@ -279,7 +284,37 @@ glui32 perform_restoreundo()
     dest.ptr = NULL;
   }
 
+  if (heapsumarr) 
+    glulx_free(heapsumarr);
+  
   return res;
+}
+
+/* has_undo():
+   Return 0 if an undo state is available, 1 if not.
+*/
+glui32 has_undo()
+{
+  if (undo_chain_size == 0 || undo_chain_num == 0)
+    return 1;
+  return 0;
+}
+
+/* discard_undo():
+   Drop the most recent undo state, if there are any.
+*/
+void discard_undo()
+{
+  if (undo_chain_size == 0 || undo_chain_num == 0)
+    return;
+
+  unsigned char *destptr = undo_chain[0];
+
+  if (undo_chain_size > 1)
+    memmove(undo_chain, undo_chain+1,
+      (undo_chain_size-1) * sizeof(unsigned char *));
+  undo_chain_num -= 1;
+  glulx_free(destptr);
 }
 
 /* perform_save():
@@ -291,8 +326,8 @@ glui32 perform_save(strid_t str)
   dest_t dest;
   int ix;
   glui32 res, lx, val;
-  glui32 memstart, memlen, stackstart, stacklen, heapstart, heaplen;
-  glui32 filestart=0, filelen;
+  glui32 memstart=0, memlen=0, stackstart=0, stacklen=0, heapstart=0, heaplen=0;
+  glui32 filestart = 0, filelen = 0;
 
   stream_get_iosys(&val, &lx);
   if (val != 2) {
@@ -424,14 +459,14 @@ glui32 perform_save(strid_t str)
  
    If fromshell is true, the restore is being invoked by the library
    shell (an autorestore of some kind). This currently happens only in
-   iosglk.
+   iosglk and remglk.
 */
 glui32 perform_restore(strid_t str, int fromshell)
 {
   dest_t dest;
   int ix;
   glui32 lx, res, val;
-  glui32 filestart, filelen;
+  glui32 filestart = 0, filelen = 0;
   glui32 heapsumlen = 0;
   glui32 *heapsumarr = NULL;
 
@@ -542,6 +577,9 @@ glui32 perform_restore(strid_t str, int fromshell)
       res = heap_apply_summary(heapsumlen, heapsumarr);
     }
   }
+
+  if (heapsumarr) 
+    glulx_free(heapsumarr);
 
   if (res)
     return 1;
@@ -1190,6 +1228,7 @@ glui32 perform_verify()
   glui32 val, newsum, ix;
 
   len = gamefile_len;
+  checksum = 0;
 
   if (len < 256 || (len & 0xFF) != 0)
     return 1;

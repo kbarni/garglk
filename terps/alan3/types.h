@@ -16,6 +16,7 @@
 
 /* PREPROCESSOR */
 #define FORWARD
+#define protected
 #define NEW(type) ((type *)allocate(sizeof(type)))
 
 
@@ -41,6 +42,10 @@
 
 #include <stdbool.h>
 
+/* A char type that accepts 8-bit characters (ISO8859-1 and UTF-8) */
+/* TODO: change all char arrays that are strings to uchar */
+typedef unsigned char uchar;
+
 /* The various tables */
 typedef struct VerbEntry {	/* VERB TABLE */
   Aint code;			/* Code for the verb */
@@ -52,7 +57,6 @@ typedef struct LimEntry {	/* LIMIT Type */
   Aword val;			/* And the limiting value */
   Aaddr stms;			/* Statements if fail */
 } LimitEntry;
-
 
 /* Functions: */
 extern Aaddr addressAfterTable(Aaddr adr, int size);

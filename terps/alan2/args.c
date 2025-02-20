@@ -226,7 +226,7 @@ void args(argc, argv)
 	advnam = strdup(argv[0]);
   }
 #else
-#if defined(__dos__) || defined(__win__)
+#if defined(__dos__) || defined(__win__) || defined(_WIN32)
   if ((prgnam = strrchr(argv[0], '\\')) == NULL
       && (prgnam = strrchr(argv[0], '/')) == NULL
       && (prgnam = strrchr(argv[0], ':')) == NULL)
@@ -266,7 +266,7 @@ void args(argc, argv)
         && strstr(prgnam, PROGNAME) == 0)
       advnam = strdup(argv[0]);
 #else
-#if defined(__unix__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__) || defined(__HAIKU__)
   if ((prgnam = strrchr(argv[0], '/')) == NULL)
     prgnam = strdup(argv[0]);
   else
