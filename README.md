@@ -1,7 +1,7 @@
-# Gargoyle for Kindle Touch Devices (Touch, Paperwhite 3, etc.)
+# Gargoyle for Kindle Touch Devices (Touch, Paperwhite, etc.) adapted to firmware 5.16+
 
 Binaries are available here:
-https://www.mobileread.com/forums/showpost.php?p=3526963&postcount=1
+https://www.mobileread.com/forums/showthread.php?t=366347
 
 Changes to upstream gargoyle (https://github.com/garglk/garglk):
 * Kindle port based on patches from: http://www.fabiszewski.net/kindle-gargoyle/
@@ -18,7 +18,8 @@ Changes to upstream gargoyle (https://github.com/garglk/garglk):
  * Two finger single tap on bottom-left side of the game screen: move cursor to the beginning of the word to the left
  * Two finger single tap on top-right side of the game screen: delete character right of cursor (= DEL key)
  * Two finger single tap on middle-right side of the game screen: delete characters right of cursor until first whitespace
- * Two finger single tap on bottom-right side of the game screen: move cursor to the beginning of the next word
+ * Two finger single tap on bottom-right side of the game screen: **display keyboard** 
+    - *use this gesture if the keyboard disappears after opening a game file*
  * Two finger single tap on top-center of the game screen: command history: previous (= key "cursor up")
  * Two finger single tap on bottom-center of the game screen: command history: next (= key "cursor down")
 
