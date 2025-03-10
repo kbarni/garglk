@@ -1,11 +1,7 @@
 /******************************************************************************
  *                                                                            *
  * Copyright (C) 2006-2009 by Tor Andersson.                                  *
-<<<<<<< HEAD
  * Copyright (C) 2009 by Baltasar Garc�a Perez-Schofield.                     *
-=======
- * Copyright (C) 2009 by Baltasar García Perez-Schofield.                     *
->>>>>>> ed98753e703ba151dcd57e45dd4ab6ed87f36149
  * Copyright (C) 2010 by Ben Cressey.                                         *
  *                                                                            *
  * This file is part of Gargoyle.                                             *
@@ -46,7 +42,7 @@ static const char * DirSeparator = "/";
 
 char dir[MaxBuffer];
 char buf[MaxBuffer];
-char tmp[MaxBuffer];
+char tmp1[MaxBuffer];
 
 struct filter
 {
@@ -233,7 +229,7 @@ static void winbrowsefile(char *buffer, int bufferSize)
 
     gtk_widget_destroy(fileRequestorDialog);
 #ifdef _KINDLE
-    closeLipcInstance();
+    //closeLipcInstance();
 #endif
 }
 
@@ -305,7 +301,7 @@ int winexec(const char *cmd, char **args)
 
 int winterp(char *path, char *exe, char *flags, char *game)
 {
-    sprintf(tmp, LaunchingTemplate, path, exe);
+    sprintf(tmp1, LaunchingTemplate, path, exe);
 
     setenv("GARGLK_INI", path, FALSE);
 
@@ -323,7 +319,7 @@ int winterp(char *path, char *exe, char *flags, char *game)
         args[1] = buf;
     }
 
-    if (!winexec(tmp, args))
+    if (!winexec(tmp1, args))
     {
         winmsg("Could not start 'terp.\nSorry.");
         return FALSE;
@@ -353,7 +349,6 @@ int main(int argc, char **argv)
         fwprintf(stderr, L"launchgtk.c: Double click time: %d\n", doubleClickTime);
         fwprintf(stderr, L"launchgtk.c: Double click distance: %d\n", doubleClickDistance);
         */
-        
         winbrowsefile(buf, sizeof(buf));
     }
 

@@ -16,6 +16,8 @@
 #include "memory.h"
 #include "utils.h"
 
+#include "alan.version.h"
+
 #ifdef HAVE_GLK
 #include "glk.h"
 #include "glkio.h"
@@ -25,13 +27,13 @@
 #include <windows.h>
 #endif
 
+/* For strcasecmp() */
+#include <strings.h>
 
 /* PUBLIC DATA */
 /* The files and filenames */
 char *adventureName;        /* The name of the game */
 char *adventureFileName;
-
-/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 /*======================================================================*/
 char *gameName(char *fullPathName) {
@@ -66,13 +68,22 @@ static bool isQuoted(char *argument) {
 /*----------------------------------------------------------------------*/
 static char *addAcodeExtension(char *adventureFileName) {
     if (strlen(adventureFileName) < strlen(ACODEEXTENSION)
-        || compareStrings(&adventureFileName[strlen(adventureFileName)-4], ACODEEXTENSION) != 0) {
+        || !equalStrings(&adventureFileName[strlen(adventureFileName)-4], ACODEEXTENSION)) {
         adventureFileName = realloc(adventureFileName, strlen(adventureFileName)+strlen(ACODEEXTENSION)+1);
         strcat(adventureFileName, ACODEEXTENSION);
     }
     return adventureFileName;
 }
 
+
+/*----------------------------------------------------------------------*/
+static void version(void) {
+#if (BUILD+0) != 0
+    printf("%s build %d", alan.version.string, BUILD);
+#else
+    printf("%s", alan.version.string);
+#endif
+}
 
 
 /*----------------------------------------------------------------------*/
@@ -86,46 +97,69 @@ static void switches(int argc, char *argv[])
         if (argument[0] == '-') {
             switch (toLower(argument[1]))
                 {
+                case 'h':
+                    usage(argv[0]);
+                    terminate(0);
+                    break;
                 case 'i':
-                    ignoreErrorOption = TRUE;
+                    encodingOption = ENCODING_ISO;
+                    break;
+                case 'u':
+                    encodingOption = ENCODING_UTF;
+                    break;
+                case 'e':
+                    ignoreErrorOption = true;
                     break;
                 case 't':
-                    traceSectionOption = TRUE;
+                    traceSectionOption = true;
                     switch (argument[2]) {
                     case '9':
                     case '8':
                     case '7':
                     case '6':
-                    case '5' : traceStackOption = TRUE;
-                    case '4' : tracePushOption = TRUE;
-                    case '3' : traceInstructionOption = TRUE;
-                    case '2' : traceSourceOption = TRUE;
+                    case '5' : tracePushOption = true;
+                    case '4' : traceStackOption = true;
+                    case '3' : traceInstructionOption = true;
+                    case '2' : traceSourceOption = true;
                     case '\0':
-                    case '1': traceSectionOption = TRUE;
+                    case '1': traceSectionOption = true;
                     }
                     break;
                 case 'd':
-                    debugOption = TRUE;
+                    debugOption = true;
                     break;
                 case 'l':
-                    transcriptOption = TRUE;
-                    logOption = FALSE;
+                    transcriptOption = true;
                     break;
                 case 'v':
-                    verboseOption = TRUE;
+                    if (strcmp(argument, "-version") == 0) {
+                        version();
+                        terminate(0);
+                    } else
+                        verboseOption = true;
                     break;
                 case 'n':
-                    statusLineOption = FALSE;
+                    statusLineOption = false;
                     break;
                 case 'c':
-                    logOption = TRUE;
-                    transcriptOption = FALSE;
+                    commandLogOption = true;
+                    break;
+                case 'p':
+                    nopagingOption = true;
                     break;
                 case 'r':
-                    regressionTestOption = TRUE;
+                    regressionTestOption = true;
+                    statusLineOption = false;
                     break;
+                case '-':
+                    if (strcasecmp(&argument[2], "version") == 0) {
+                        version();
+                        terminate(0);
+                        break;
+                    }
+                    /* else fall-through */
                 default:
-                    printf("Unrecognized switch, -%c\n", argument[1]);
+                    printf("Unrecognized switch, -%s\n", &argument[1]);
                     usage(argv[0]);
                     terminate(0);
                 }
@@ -152,20 +186,70 @@ bool differentInterpreterName(char *string) {
 
 
 /*======================================================================*/
-#if defined(__dos__) || defined(__windows__) || defined(__cygwin__)
-#include "winargs.c"
-#else
-#if defined(__unix__) || defined(__macos__)
-#include "unixargs.c"
-#else
-#ifdef __mac__
-#include "macargs.c"
-#else
-/***********************************************************************\
+#ifdef __windows__
+#include <windows.h>
+#endif
 
-   UNIMPLEMENTED OS
 
-\***********************************************************************/
+/*======================================================================*/
+void args(int argc, char * argv[])
+{
+    char *programName;
+    char *exePoint;
+
+#ifdef ARGSDISPLAY
+    int i;
+
+    MessageBox(NULL, "Hello!", "Windows Arun interpreter", MB_OK);
+    MessageBox(NULL, GetCommandLine(), "", MB_OK);
+    for (i = 0; i < argc; i++) {
+        char buf[199];
+        sprintf(buf, "arg %d :\"%s\"", i, argv[i]);
+        MessageBox(NULL, buf, "Alan V3 compiler", MB_OK);
+    }
 #endif
+
+#ifdef HAVE_WINGLK
+    argv[0] = GetCommandLine();
 #endif
+    if ((programName = strrchr(argv[0], '\\')) == NULL
+        && (programName = strrchr(argv[0], '/')) == NULL
+        && (programName = strrchr(argv[0], ':')) == NULL)
+        programName = strdup(argv[0]);
+    else
+        programName = strdup(&programName[1]);
+
+    if (strlen(programName) > 4 && (((exePoint = strstr(programName, ".EXE")) != NULL) || (exePoint = strstr(programName, ".exe")) != NULL))
+        *exePoint = '\0';
+
+    /* Now look at the switches and arguments */
+    switches(argc, argv);
+
+#ifdef ARGSDISPLAY
+    {
+        char buf[100];
+        sprintf(buf, "programName = '%s'\nadventureFileName = '%s'", programName, adventureFileName);
+        MessageBox(NULL, buf, "Alan V3 compiler", MB_OK);
+    }
 #endif
+
+    if (adventureFileName == NULL) {
+        /* No game given, try program name */
+        if (differentInterpreterName(programName)) {
+            // TODO break out as a function
+            FILE *adventureFile;
+            adventureFileName = allocate(strlen(programName)
+                                         +strlen(ACODEEXTENSION)+1);
+            strcpy(adventureFileName, programName);
+            strcat(adventureFileName, ACODEEXTENSION);
+            // TODO break out as utils::fileExists()
+            if ((adventureFile = fopen(adventureFileName, "r")) == NULL) {
+                free(adventureFileName);
+                adventureFileName = NULL;
+            } else
+                fclose(adventureFile);
+        }
+    }
+    adventureName = gameName(adventureFileName);
+    free(programName);
+}

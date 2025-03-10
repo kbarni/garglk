@@ -17,7 +17,6 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA *
  *                                                                            *
  *****************************************************************************/
-
 /* 
  * File:   gtk_utils.c
  * Author: schoen
@@ -126,7 +125,6 @@ void openVirtualKeyboard(GtkWidget * widget, gpointer * callback_data) {
     if (lipcInstance == 0) {
 		openLipcInstance();
 	}
-	
 	int isKeboardVisible = 0;
 	LipcGetIntProperty(
                 lipcInstance,
@@ -143,19 +141,6 @@ void openVirtualKeyboard(GtkWidget * widget, gpointer * callback_data) {
     else {
     	fwprintf(stderr, L"---->openVirtualKeyboard - Keyboard already opened, doing noting.\n");
     }
-    /* int pid = fork();
-	if (pid == 0) {
-		char *args[] = { "/usr/bin/lipc-set-prop",
-                    "-s",
-                    "com.lab126.keyboard",
-                    "open",
-                    "net.fabiszewski.gargoyle:abc:0",
-                    NULL };
-        fwprintf(stderr, L"---->openVirtualKeyboard-execv()\n");
-		execv(args[0], args); 
-		exit(EXIT_SUCCESS);
-	}
-	*/
 }
 
 GtkWidget * createAndInitKindleFileRequestor(

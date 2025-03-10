@@ -11,6 +11,9 @@
 /* IMPORTS */
 #include <time.h>
 
+/* For strcasecmp() */
+#include <strings.h>
+
 #include "types.h"
 #include "sysdep.h"
 
@@ -63,7 +66,8 @@ jmp_buf forfeitLabel;       /* Player forfeit by an empty command */
 
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-static char logFileName[256] = "";
+static char transcriptFileName[256] = "";
+static char commandLogFileName[256] = "";
 
 /*======================================================================*/
 void setStyle(int style)
@@ -87,14 +91,14 @@ void print(Aword fpos, Aword len)
     int ch = 0;
     int i;
     long savfp = 0;     /* Temporary saved text file position */
-    static bool printFlag = FALSE; /* Printing already? */
+    static bool printFlag = false; /* Printing already? */
     bool savedPrintFlag = printFlag;
     void *info = NULL;      /* Saved decoding info */
 
 
     if (len == 0) return;
 
-    if (isHere(HERO, TRUE)) {   /* Check if the player will see it */
+    if (isHere(HERO, true)) {   /* Check if the player will see it */
         if (printFlag) {            /* Already printing? */
             /* Save current text file position and/or decoding info */
             if (header->pack)
@@ -102,7 +106,7 @@ void print(Aword fpos, Aword len)
             else
                 savfp = ftell(textFile);
         }
-        printFlag = TRUE;           /* We're printing now! */
+        printFlag = true;           /* We're printing now! */
 
         /* Position to start of text */
         fseek(textFile, fpos+header->stringOffset, 0);
@@ -123,9 +127,6 @@ void print(Aword fpos, Aword len)
                 str[i] = ch;
             }
             str[i] = '\0';
-#if ISO == 0
-            fromIso(str, str);
-#endif
             output(str);
         }
 
@@ -147,7 +148,11 @@ void sys(Aword fpos, Aword len)
     char *command;
 
     command = getStringFromFile(fpos, len);
-    system(command);
+    // Gargoyle will not allow games to run arbitrary programs.
+#ifndef GARGLK
+    if (system(command) == -1)
+        /* Ignore errors */;
+#endif
     deallocate(command);
 }
 
@@ -190,7 +195,7 @@ void score(Aword sc)
     } else {
         current.score += scores[sc-1];
         scores[sc-1] = 0;
-        gameStateChanged = TRUE;
+        gameStateChanged = true;
     }
 }
 
@@ -235,7 +240,7 @@ void quitGame(void)
 
     current.location = where(HERO, DIRECT);
     para();
-    while (TRUE) {
+    while (true) {
         col = 1;
         statusline();
         printMessage(M_QUITACTION);
@@ -245,7 +250,7 @@ void quitGame(void)
         if (gets(buf) == NULL) terminate(0);
 #endif
         if (strcasecmp(buf, "restart") == 0)
-            longjmp(restartLabel, TRUE);
+            longjmp(restartLabel, true);
         else if (strcasecmp(buf, "restore") == 0) {
             restore();
             return;
@@ -279,7 +284,7 @@ void restartGame(void)
     current.location = where(HERO, DIRECT);
     para();
     if (confirm(M_REALLY)) {
-        longjmp(restartLabel, TRUE);
+        longjmp(restartLabel, true);
     }
     current.location = previousLocation;
 }
@@ -557,6 +562,7 @@ void showImage(int image, int align)
         (glk_gestalt(gestalt_DrawImage, wintype_TextBuffer) == 1)) {
         glk_window_flow_break(glkMainWin);
         printf("\n");
+        /* align will always be 0 as Alan don't have image align, so use margin left */
         ecode = glk_image_draw(glkMainWin, image, imagealign_MarginLeft, 0);
         (void)ecode;
     }
@@ -617,7 +623,7 @@ void use(int actor, int script)
         admin[actor].waitCount = evaluate(step->after);
     }
 
-    gameStateChanged = TRUE;
+    gameStateChanged = true;
 }
 
 /*======================================================================*/
@@ -633,7 +639,7 @@ void stop(int act)
     admin[act].script = 0;
     admin[act].step = 0;
 
-    gameStateChanged = TRUE;
+    gameStateChanged = true;
 }
 
 
@@ -681,8 +687,8 @@ bool contains(Aptr string, Aptr substring)
 {
     bool found;
 
-    strlow((char *)fromAptr(string));
-    strlow((char *)fromAptr(substring));
+    stringToLowerCase((char *)fromAptr(string));
+    stringToLowerCase((char *)fromAptr(substring));
 
     found = (strstr((char *)fromAptr(string), (char *)fromAptr(substring)) != 0);
 
@@ -695,23 +701,36 @@ bool streq(char a[], char b[])
 {
     bool eq;
 
-    strlow(a);
-    strlow(b);
+    stringToLowerCase(a);
+    stringToLowerCase(b);
 
     eq = (strcmp(a, b) == 0);
 
     return eq;
 }
 
+#if defined(HAVE_GLK) && defined(GLK_MODULE_DATETIME)
+static void createLogfileName(char *createdFileName, const char extension[]) {
+    if (glk_gestalt(gestalt_DateTime, 0) != 0 && !regressionTestOption) {
+        glktimeval_t tv;
+        glkdate_t date;
+        glk_current_time(&tv);
+        glk_time_to_date_local(&tv, &date);
 
-
-/*======================================================================*/
+        sprintf(createdFileName, "%s%d%02d%02d%02d%02d%02d%04d%s",
+                adventureName, date.year, date.month,
+                date.day, date.hour, date.minute, date.second,
+                date.microsec,
+                extension);
+    } else {
+        sprintf(createdFileName, "%s%s", adventureName, extension);
+    }
+}
+#else
 #include <sys/time.h>
-void startTranscript(void) {
-    time_t tick;
 
-    if (logFile != NULL)
-        return;
+static void createLogfileName(char *createdFileName, const char extension[]) {
+    time_t tick;
 
     time(&tick);
 
@@ -720,36 +739,77 @@ void startTranscript(void) {
     gettimeofday(&tv, NULL);
     tm = localtime(&tv.tv_sec);
 
-    sprintf(logFileName, "%s%d%02d%02d%02d%02d%02d%04d.log",
-            adventureName, tm->tm_year+1900, tm->tm_mon+1,
-            tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
-            (int)tv.tv_usec);
-#ifdef HAVE_GLK
-    glui32 fileUsage = transcriptOption?fileusage_Transcript:fileusage_InputRecord;
-    frefid_t logFileRef = glk_fileref_create_by_name(fileUsage, logFileName, 0);
-    logFile = glk_stream_open_file(logFileRef, filemode_Write, 0);
-#else
-    logFile = fopen(logFileName, "w");
+    if (!regressionTestOption)
+        sprintf(createdFileName, "%s%d%02d%02d%02d%02d%02d%04d%s",
+                adventureName, tm->tm_year+1900, tm->tm_mon+1,
+                tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
+                (int)tv.tv_usec,
+                extension);
+    else
+        sprintf(createdFileName, "%s%s", adventureName, extension);
+}
 #endif
-    if (logFile == NULL) {
-        transcriptOption = FALSE;
-        logOption = FALSE;
+
+/*======================================================================*/
+void startTranscript(void) {
+    if (transcriptFile != NULL)
+        return;
+
+    createLogfileName(transcriptFileName, ".a3t");
+#ifdef HAVE_GLK
+    glui32 fileUsage = fileusage_Transcript;
+    frefid_t logFileRef = glk_fileref_create_by_name(fileUsage, transcriptFileName, 0);
+    transcriptFile = glk_stream_open_file(logFileRef, filemode_Write, 0);
+#else
+    transcriptFile = fopen(transcriptFileName, "w");
+#endif
+    /* If we couldn't open file, don't do transcript */
+    if (transcriptFile == NULL) {
+        transcriptOption = false;
+    } else {
+        transcriptOption = true;
+        if (encodingOption == ENCODING_UTF) {
+            uchar BOM[3] = {0xEF,0xBB,0xBF};
+            fwrite((char *)BOM, sizeof(BOM), 1, transcriptFile);
+        }
+    }
+}
+
+
+/*======================================================================*/
+void startCommandLog(void) {
+    if (commandLogFile != NULL)
+        return;
+
+    createLogfileName(commandLogFileName, ".a3s");
+#ifdef HAVE_GLK
+    glui32 fileUsage = fileusage_InputRecord;
+    frefid_t logFileRef = glk_fileref_create_by_name(fileUsage, commandLogFileName, 0);
+    commandLogFile = glk_stream_open_file(logFileRef, filemode_Write, 0);
+#else
+    commandLogFile = fopen(commandLogFileName, "w");
+#endif
+    /* If we couldn't open file, don't do command logging */
+    if (commandLogFile == NULL) {
+        commandLogOption = false;
+    } else if (encodingOption == ENCODING_UTF) {
+        uchar BOM[3] = {0xEF,0xBB,0xBF};
+        fwrite((char *)BOM, sizeof(BOM), 1, commandLogFile);
     }
 }
 
 
 /*======================================================================*/
 void stopTranscript(void) {
-    if (logFile == NULL)
+    if (transcriptFile == NULL)
         return;
 
-    if (transcriptOption|| logOption)
+    if (transcriptOption)
 #ifdef HAVE_GLK
-        glk_stream_close(logFile, NULL);
+        glk_stream_close(transcriptFile, NULL);
 #else
-    fclose(logFile);
+        fclose(transcriptFile);
 #endif
-    logFile = NULL;
-    transcriptOption = FALSE;
-    logOption = FALSE;
+    transcriptFile = NULL;
+    transcriptOption = false;
 }

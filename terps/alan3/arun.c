@@ -1,8 +1,8 @@
 /*----------------------------------------------------------------------* \
 
-	arun.c
+    arun.c
 
-	Main program for interpreter for ALAN Adventure Language
+    Main program for interpreter for ALAN Adventure Language
 
 \*----------------------------------------------------------------------*/
 #include <locale.h>
@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
     }
 #endif
 
-    if ((debugOption && !regressionTestOption) || verboseOption) {
+    if ((debugOption || verboseOption) && !regressionTestOption) {
         if (debugOption) printf("<");
 #if (BUILD+0) != 0
         printVersion(BUILD);
@@ -72,7 +72,6 @@ int main(int argc, char *argv[])
         printVersion(0);
 #endif
         if (debugOption) printf(">");
-        newline();
         newline();
     }
 
@@ -88,4 +87,3 @@ int main(int argc, char *argv[])
     return(EXIT_SUCCESS);
 #endif
 }
-

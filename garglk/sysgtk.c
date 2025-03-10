@@ -468,6 +468,33 @@ static void onexpose(GtkWidget *widget, GdkEventExpose *event, void *data)
         gli_image_s);
 }
 
+static void
+quit_confirmation (GtkWidget *widget, gpointer user_data)
+{
+    GtkWidget *dialog;
+    gint response;
+    GtkWindow *parent = GTK_WINDOW(user_data);
+
+    /* Create a modal question dialog with Yes/No buttons */
+    dialog = gtk_message_dialog_new(parent,
+                                    GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+                                    GTK_MESSAGE_QUESTION,
+                                    GTK_BUTTONS_YES_NO,
+                                    "Are you sure you want to quit? You will lose all unsaved progress!");
+    gtk_window_set_title(GTK_WINDOW(dialog), "Close Gargoyle");
+
+    /* Run the dialog and store the user response */
+    response = gtk_dialog_run(GTK_DIALOG(dialog));
+
+    if (response == GTK_RESPONSE_YES) {
+        /* If Yes, destroy dialog and quit the main loop */
+        gtk_widget_destroy(dialog);
+        gtk_main_quit();
+    } else {
+        /* If No (or close), just destroy dialog */
+        gtk_widget_destroy(dialog);
+    }
+}
 
 #ifdef _ALT_MOUSE_HANDLING
 static void onbuttondown(GtkWidget *widget, GdkEventButton *event, void *data)
@@ -477,11 +504,11 @@ static void onbuttondown(GtkWidget *widget, GdkEventButton *event, void *data)
         //fwprintf(stderr, L"Double click\n");
         gli_input_handle_double_click(event->x, event->y);
     }
-    else if (event->button == 1) {
+    else if (event->button == 1) {          // tap on word
         //fwprintf(stderr, L"Button 1\n");
         gli_input_handle_click(event->x, event->y);
     }
-    else if (event->button == 2 || event->button == 3) {
+    else if (event->button == 2 || event->button == 3) {    // two finger tap
         //fwprintf(stderr, L"Button 2\n");
         int y0 = gli_rootwin->bbox.y0;
         int y1 = gli_rootwin->bbox.y1;
@@ -493,33 +520,36 @@ static void onbuttondown(GtkWidget *widget, GdkEventButton *event, void *data)
         int xOneThirdOfWinWidth = (x1 - x0) / 3.0;
         
         if ((event->x - x0) <= xOneThirdOfWinWidth) {
-            if ((event->y - y0) <= yOneThirdOfWinHeight) {
+            if ((event->y - y0) <= yOneThirdOfWinHeight) {  // top left -> Escape
                 gli_input_handle_key(keycode_Escape);
             }
-            else if ((event->y - y0) >= y1 - yOneThirdOfWinHeight) {
+            else if ((event->y - y0) >= y1 - yOneThirdOfWinHeight) {    //bottom left -> go left 1 word
                 gli_input_handle_key(keycode_SkipWordLeft);
             }
-            else 
+            else                                                        //center left -> delete last word
             {
                 gli_input_handle_key(keycode_DeleteUntilPreviousWordBeginning);
             }
         }
         else if ((event->x - x0) >= (x1 - xOneThirdOfWinWidth)) {
-            if ((event->y - y0) <= yOneThirdOfWinHeight) {
+            if ((event->y - y0) <= yOneThirdOfWinHeight) {             //top right -> delete last char
                 gli_input_handle_key(keycode_Erase);
+                //quit_confirmation(widget,data);
+                
             }
-            else if ((event->y - y0) >= y1 - yOneThirdOfWinHeight) {
-                gli_input_handle_key(keycode_SkipWordRight);
+            else if ((event->y - y0) >= y1 - yOneThirdOfWinHeight) {    //bottom right -> display keyboard
+                //gli_input_handle_key(keycode_SkipWordRight);
+                openVirtualKeyboard(widget,data);
             }
             else 
-            {
+            {                                                           // center right -> delete next word
                 gli_input_handle_key(keycode_DeleteUntilNextWordBeginning);
             }
         }
-        else if ((event->y - y0) <= y_center) {
+        else if ((event->y - y0) <= y_center) {                         //center top -> last command
             gli_input_handle_key(keycode_Up);
         }
-        else 
+        else                                                            // center bottom -> next command
         {
             gli_input_handle_key(keycode_Down);
         }
@@ -795,7 +825,7 @@ void winopen(void)
                        GTK_SIGNAL_FUNC(onquit), "WM destroy");
     gtk_signal_connect(GTK_OBJECT(frame), "motion_notify_event",
         GTK_SIGNAL_FUNC(onmotion), NULL);
-    gtk_signal_connect(GTK_OBJECT(frame), "focus_in_event",
+    gtk_signal_connect_after(GTK_OBJECT(frame), "focus_in_event",
                        GTK_SIGNAL_FUNC(openVirtualKeyboard), NULL);
 
     canvas = gtk_drawing_area_new();

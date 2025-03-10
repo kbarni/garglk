@@ -80,6 +80,7 @@
 #define ReleaseVMUstring(ptr)  \
     (free_temp_ustring(ptr))
 
+#include <time.h>
 #include "glk.h"
 #include "glulxe.h"
 #include "gi_dispa.h"
@@ -155,7 +156,7 @@ extern gidispatch_rock_t glulxe_classtable_register_existing(void *obj,
 
 /* The library_select_hook is called every time the VM blocks for input.
    The app might take this opportunity to autosave, for example. */
-static void (*library_select_hook)(glui32) = NULL;
+static void (*library_select_hook)(glui32, glui32, glui32, glui32) = NULL;
 
 static char *grab_temp_c_array(glui32 addr, glui32 len, int passin);
 static void release_temp_c_array(char *arr, glui32 addr, glui32 len, int passout);
@@ -178,6 +179,7 @@ static char *get_game_id(void);
 int init_dispatch()
 {
   int ix;
+  int randish;
   
   /* What with one thing and another, this *could* be called more than
      once. We only need to allocate the tables once. */
@@ -196,9 +198,10 @@ int init_dispatch()
     * sizeof(classtable_t *));
   if (!classes)
     return FALSE;
-    
+
+  randish = time(NULL) % 101;
   for (ix=0; ix<num_classes; ix++) {
-    classes[ix] = new_classtable((glulx_random() % (glui32)(101)) + 1);
+    classes[ix] = new_classtable(1+120*ix+randish);
     if (!classes[ix])
       return FALSE;
   }
@@ -210,7 +213,7 @@ int init_dispatch()
     &glulxe_retained_unregister);
   
   /* If the library supports autorestore callbacks, set those up too.
-     (These are only used in iosglk, currently.) */
+     (These are only used in iosglk and remglk, currently.) */
 #ifdef GIDISPATCH_AUTORESTORE_REGISTRY
   gidispatch_set_autorestore_registry(&glulxe_array_locate,
     &glulxe_array_restore);
@@ -242,6 +245,14 @@ glui32 perform_glk(glui32 funcnum, glui32 numargs, glui32 *arglist)
       goto WrongArgNum;
     retval = find_id_for_stream(glk_stream_get_current());
     break;
+  case 0x0062: /* fileref_create_by_prompt */
+    /* call a library hook on every glk_fileref_create_by_prompt(),
+       because it blocks and waits like glk_select() */
+    if (library_select_hook)
+      library_select_hook(0x0062, arglist[0], arglist[1], arglist[2]);
+    /* but then fall through to full dispatcher, because there's no real
+       need for speed here */
+    goto FullDispatcher;
   case 0x0080: /* put_char */
     if (numargs != 1)
       goto WrongArgNum;
@@ -255,7 +266,7 @@ glui32 perform_glk(glui32 funcnum, glui32 numargs, glui32 *arglist)
   case 0x00C0: /* select */
     /* call a library hook on every glk_select() */
     if (library_select_hook)
-      library_select_hook(arglist[0]);
+      library_select_hook(0x00C0, arglist[0], 0, 0);
     /* but then fall through to full dispatcher, because there's no real
        need for speed here */
     goto FullDispatcher;
@@ -1483,7 +1494,7 @@ static gidispatch_rock_t glulxe_array_restore(long bufkey,
   return rock;
 }
 
-void set_library_select_hook(void (*func)(glui32))
+void set_library_select_hook(void (*func)(glui32, glui32, glui32, glui32))
 {
   library_select_hook = func;
 }
