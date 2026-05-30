@@ -1,0 +1,3 @@
+[submodule "ifdb-dl"]
+	path = ifdb-dl
+	url = https://github.com/dfghjkjhgr/ifdb-dl
