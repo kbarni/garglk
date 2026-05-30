@@ -121,6 +121,7 @@ void closeLipcInstance() {
 }
 
 void openVirtualKeyboard(GtkWidget * widget, gpointer * callback_data) {
+    if (gli_conf_fullscreen) return;
     /* lipc-set-prop -s com.lab126.keyboard open net.fabiszewski.gargoyle:abc:0 */
     if (lipcInstance == 0) {
 		openLipcInstance();
@@ -148,19 +149,28 @@ GtkWidget * createAndInitKindleFileRequestor(
         const GtkSortType directoryListSortOrder,
         const GtkSortType filenameListSortOrder)
 {
+    if ((env = getenv("GARGOYLE_FULLSCREEN")) != NULL)
+        gli_conf_fullscreen = atoi(env);
+
     GdkScreen * screen = gdk_screen_get_default();
     gint screen_height = gdk_screen_get_height(screen);
     gint screen_width = gdk_screen_get_width(screen);
+    printf("Screen size: %d x %d %s\n", screen_width, screen_height, gli_conf_fullscreen ? "(fullscreen)" : "(windowed)");
+    int win_height = screen_height;
+    if (!gli_conf_fullscreen)
+        win_height -= screen_height / KBFACTOR;
 
     GtkFileSelection * fileRequestor = GTK_FILE_SELECTION(gtk_file_selection_new(KDIALOG));
-    gtk_signal_connect(GTK_OBJECT(fileRequestor), "focus_in_event",
-                       GTK_SIGNAL_FUNC(openVirtualKeyboard), NULL);
+
+    if (!gli_conf_fullscreen)
+        gtk_signal_connect(GTK_OBJECT(fileRequestor), "focus_in_event",
+                           GTK_SIGNAL_FUNC(openVirtualKeyboard), NULL);
     //fwprintf(stderr, L"---->Signal connected\n");
     
     //gtk_widget_hide(GTK_FILE_SELECTION(filedlog)->history_pulldown);
     // K*ndle GTK port does not properly support/fully implement fileop buttons in GtkFileSelection.
     gtk_file_selection_hide_fileop_buttons(fileRequestor);
-    gtk_widget_set_size_request(GTK_WIDGET(fileRequestor), screen_width, (screen_height - screen_height/KBFACTOR));
+    gtk_widget_set_size_request(GTK_WIDGET(fileRequestor), screen_width, win_height);
     gtk_window_set_resizable(GTK_WINDOW(fileRequestor), FALSE);
 
     // Make the filename list sortable and sort it in descending order by default.

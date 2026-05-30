@@ -1,0 +1,12 @@
+{
+	"items": [
+        {"name": "gargoyle",
+            "priority": 0,
+            "items": [
+		        {"name": "play gargoyle", "priority": 1, "action": "./gargoyle.sh", "exitmenu": true},
+		        {"name": "gargoyle w. ext. keyb.", "priority": 1, "action": "./gargoyle_nokb.sh", "exitmenu": true},
+		        {"name": "game downloader", "priority": 2, "action": "/mnt/us/extensions/kterm/bin/kterm -e \"/mnt/us/extensions/gargoyle/dist/ifdb-dl\" -k 1 -o U -s 7", "exitmenu": false}
+            ]
+        }
+	]
+}

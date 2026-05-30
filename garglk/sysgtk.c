@@ -481,15 +481,15 @@ quit_confirmation (GtkWidget *widget, gpointer user_data)
                                     GTK_MESSAGE_QUESTION,
                                     GTK_BUTTONS_YES_NO,
                                     "Are you sure you want to quit? You will lose all unsaved progress!");
-    gtk_window_set_title(GTK_WINDOW(dialog), "Close Gargoyle");
+    gtk_window_set_title(GTK_WINDOW(dialog), KDIALOG);
 
     /* Run the dialog and store the user response */
     response = gtk_dialog_run(GTK_DIALOG(dialog));
 
     if (response == GTK_RESPONSE_YES) {
-        /* If Yes, destroy dialog and quit the main loop */
+        /* If Yes, destroy dialog and quit */
         gtk_widget_destroy(dialog);
-        gtk_main_quit();
+        winexit();
     } else {
         /* If No (or close), just destroy dialog */
         gtk_widget_destroy(dialog);
@@ -537,9 +537,11 @@ static void onbuttondown(GtkWidget *widget, GdkEventButton *event, void *data)
                 //quit_confirmation(widget,data);
                 
             }
-            else if ((event->y - y0) >= y1 - yOneThirdOfWinHeight) {    //bottom right -> display keyboard
-                //gli_input_handle_key(keycode_SkipWordRight);
-                openVirtualKeyboard(widget,data);
+            else if ((event->y - y0) >= y1 - yOneThirdOfWinHeight) {    //bottom right -> display keyboard OR quit
+                if (gli_conf_fullscreen)
+                    quit_confirmation(widget, frame);
+                else
+                    openVirtualKeyboard(widget,data);
             }
             else 
             {                                                           // center right -> delete next word
@@ -768,38 +770,47 @@ void handler(int sig) {
 
 void wininit(int *argc, char **argv)
 {
+    printf("wininit\n");
+    int i;
+    char *env;
     signal(SIGSEGV, handler);   /* Install handler for stacktrace output */
+
+    if ((env = getenv("GARGOYLE_FULLSCREEN")) != NULL)
+        gli_conf_fullscreen = atoi(env);
+
+    for (i = 1; i < *argc; i++)
+    {
+        if (!strcmp(argv[i], "-fullscreen"))
+            gli_conf_fullscreen = 1;
+    }
+
     gtk_init(argc, &argv);
     gtk_widget_set_default_colormap(gdk_rgb_get_cmap());
     gtk_widget_set_default_visual(gdk_rgb_get_visual());
     gdk_hand = gdk_cursor_new(GDK_HAND2);
     gdk_ibeam = gdk_cursor_new(GDK_XTERM);
-    
-    /* For testing GTK settings... */
-    /*
-    gint doubleClickTime = 0;
-    g_object_get(gtk_settings_get_default(), "gtk-double-click-time", &doubleClickTime, NULL);
-
-    gint doubleClickDistance = 0;
-    g_object_get(gtk_settings_get_default(), "gtk-double-click-distance", &doubleClickDistance, NULL);
-
-    fwprintf(stderr, L"sysgtk.c: Double click time: %d\n", doubleClickTime);
-    fwprintf(stderr, L"sysgtk.c: Double click distance: %d\n", doubleClickDistance);
-    */
 }
 
 #ifdef _KINDLE
 void winopen(void)
 {
     GdkGeometry geom;
+    char *env;
     GdkScreen *screen = gdk_screen_get_default();
     gint screen_height = gdk_screen_get_height(screen);
     gint screen_width = gdk_screen_get_width(screen);
 
-    geom.min_width  = screen_width; //gli_wmarginx * 2 + gli_cellw * 0;
-    geom.min_height = (screen_height - screen_height/KBFACTOR); //gli_wmarginy * 2 + gli_cellh * 0;
-    geom.max_width  = screen_width; //gli_wmarginx * 2 + gli_cellw * 255;
-    geom.max_height = (screen_height - screen_height/KBFACTOR); //gli_wmarginy * 2 + gli_cellh * 250;
+    if ((env = getenv("GARGOYLE_FULLSCREEN")) != NULL)
+        gli_conf_fullscreen = atoi(env);
+
+    int win_height = screen_height;
+    if (!gli_conf_fullscreen)
+        win_height -= screen_height / KBFACTOR;
+
+    geom.min_width  = screen_width;
+    geom.min_height = win_height;
+    geom.max_width  = screen_width;
+    geom.max_height = win_height;
     geom.width_inc = gli_cellw;
     geom.height_inc = gli_cellh;
 
@@ -825,8 +836,10 @@ void winopen(void)
                        GTK_SIGNAL_FUNC(onquit), "WM destroy");
     gtk_signal_connect(GTK_OBJECT(frame), "motion_notify_event",
         GTK_SIGNAL_FUNC(onmotion), NULL);
-    gtk_signal_connect_after(GTK_OBJECT(frame), "focus_in_event",
-                       GTK_SIGNAL_FUNC(openVirtualKeyboard), NULL);
+
+    if (!gli_conf_fullscreen)
+        gtk_signal_connect_after(GTK_OBJECT(frame), "focus_in_event",
+                           GTK_SIGNAL_FUNC(openVirtualKeyboard), NULL);
 
     canvas = gtk_drawing_area_new();
     gtk_signal_connect(GTK_OBJECT(canvas), "size_allocate",
@@ -845,7 +858,7 @@ void winopen(void)
         GTK_WIDGET(frame), &geom,
         GDK_HINT_MIN_SIZE | GDK_HINT_MAX_SIZE
         );
-    gtk_window_set_default_size(GTK_WINDOW(frame), screen_width, (screen_height - screen_height/KBFACTOR));
+    gtk_window_set_default_size(GTK_WINDOW(frame), screen_width, win_height);
 
     gtk_widget_show(canvas);
     gtk_widget_show(frame);
