@@ -63,7 +63,7 @@
 			<array>
 				<string>public.agt</string>
 			</array>
-		</dict>		
+		</dict>
 		<dict>
 			<key>CFBundleTypeExtensions</key>
 			<array>
@@ -168,7 +168,6 @@
 			<key>CFBundleTypeExtensions</key>
 			<array>
 				<string>l9</string>
-				<string>sna</string>
 			</array>
 			<key>CFBundleTypeIconFile</key>
 			<string>docu2.icns</string>
@@ -200,8 +199,7 @@
 		<dict>
 			<key>CFBundleTypeExtensions</key>
 			<array>
-				<string>asl</string>
-				<string>cas</string>
+				<string>plus</string>
 			</array>
 			<key>CFBundleTypeIconFile</key>
 			<string>docu2.icns</string>
@@ -211,7 +209,7 @@
 			<string>Viewer</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>public.quest</string>
+				<string>public.plus</string>
 			</array>
 		</dict>
 		<dict>
@@ -228,6 +226,22 @@
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>public.saga</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>tay</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>docu2.icns</string>
+			<key>CFBundleTypeName</key>
+			<string>Story File</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.taylor</string>
 			</array>
 		</dict>
 		<dict>
@@ -283,7 +297,7 @@
 			<array>
 				<string>public.blorb.zcode</string>
 			</array>
-		</dict>		
+		</dict>
 	</array>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
@@ -468,7 +482,6 @@
 				<key>public.filename-extension</key>
 				<array>
 					<string>l9</string>
-					<string>sna</string>
 				</array>
 			</dict>
 		</dict>
@@ -503,13 +516,12 @@
 			<key>UTTypeIconFile</key>
 			<string>docu2.icns</string>
 			<key>UTTypeIdentifier</key>
-			<string>public.quest</string>
+			<string>public.plus</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>asl</string>
-					<string>cas</string>
+					<string>plus</string>
 				</array>
 			</dict>
 		</dict>
@@ -530,6 +542,26 @@
 				<key>public.filename-extension</key>
 				<array>
 					<string>saga</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>com.googlecode.garglk</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Story File</string>
+			<key>UTTypeIconFile</key>
+			<string>docu2.icns</string>
+			<key>UTTypeIdentifier</key>
+			<string>public.taylor</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>tay</string>
 				</array>
 			</dict>
 		</dict>
@@ -598,7 +630,7 @@
 					<string>zblorb</string>
 				</array>
 			</dict>
-		</dict>		
+		</dict>
 	</array>
 	<key>CFBundleURLTypes</key>
 	<array>

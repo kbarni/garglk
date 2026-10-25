@@ -1,0 +1,73 @@
+name: Kindle
+
+on:
+  push:
+    branches: ['kindle*']
+    tags: ['*kindle*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  KOXTOOLCHAIN_VERSION: '2026.08'
+
+jobs:
+  kindlehf:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Restore toolchain and SDK
+        id: sdk
+        uses: actions/cache@v6
+        with:
+          path: ~/x-tools/arm-kindlehf-linux-gnueabihf
+          key: kindlehf-${{ env.KOXTOOLCHAIN_VERSION }}-sdk-5.16.3
+
+      - name: Install toolchain and SDK
+        if: steps.sdk.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-dev nettle-dev zlib1g-dev zstd
+          mkdir -p ~/x-tools
+          curl -fsSL "https://github.com/koreader/koxtoolchain/releases/download/${KOXTOOLCHAIN_VERSION}/kindlehf.tar.zst" |
+            tar --zstd -x -C ~/x-tools --strip-components=1
+          git clone --recursive --depth=1 https://github.com/KindleModding/kindle-sdk.git "${RUNNER_TEMP}/kindle-sdk"
+          cd "${RUNNER_TEMP}/kindle-sdk"
+          ./gen-sdk.sh kindlehf
+
+      - name: Install build tools
+        run: sudo apt-get install -y ninja-build
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: false
+
+      - name: Build
+        run: sh support/kindle/build.sh
+
+      - name: Package
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then
+            export VERSION="${GITHUB_REF_NAME}"
+          fi
+          sh support/kindle/package.sh
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: gargoyle-kindlehf
+          path: |
+            build/package/*.zip
+            build/package/*.kpkg
+
+      - name: Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            build/package/*.zip
+            build/package/*.kpkg

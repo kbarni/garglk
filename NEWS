@@ -1,0 +1,94 @@
+2026.1:
+• Gargoyle now implements Glk version 0.7.6.
+• Infocom’s graphical games are now playable, with some visual quirks.
+• Support for building with MSVC (thanks to Adrian Welcker).
+• Experimental, disabled-by-default support for Adrift 5 games via the new
+  Frankendrift interpreter (thanks to Adrian Welcker).
+• Support for (and default to) Qt 6 and KDE Frameworks 6.
+• Added graphics scalers hqx and xBRZ.
+• MIDI and graphics support for Adrift games.
+• Image scaling can be specified for Magnetic Scrolls games.
+• Location of game data (save files, transcripts, etc) can be configured.
+• Improved behavior of pasting text with newlines.
+• The scrollback buffer can be saved to a text file (Ctrl-Shift-S / ⌘-Shift-S).
+• Added a toggle for full screen (Alt-Enter / ⌘-Ctrl-F).
+• On Unix, Gargoyle’s XDG data directory name changed from
+  “io.github.garglk/Gargoyle” to just “gargoyle”. The older location is still
+  checked for backward compatibility.
+• Interpreter updates.
+• Various accumulated small fixes and updates.
+
+2023.1:
+• $HOME/garglk.ini is loaded on macOS again.
+• Fallback fonts work on macOS again.
+• Non-ASCII filenames are better supported on Windows.
+• Transcripts update in real time again.
+• Fix some cases where Agility save/restore prompts didn’t work on macOS.
+• Fix media loading in JACL and Hugo.
+• Avoid potential crash with newer versions of SDL2_mixer.
+• Readline-style shortcuts are available on macOS now.
+• Interpreter updates: Agility 1.1.2, Alan3 3.0beta8, Bocfel 2.1.1, Git 1.3.7,
+  Glulxe 0.6.0.
+• New interpreters: Taylormade and Plus. These support a wider range of Scott
+  Adams-style games. In addition, ScottFree has been updated to support
+  graphics. Thanks to Petter Sjölund.
+• Support the quasi-standard glkunix_fileref_get_filename() function.
+• Gargoyle now supports color themes, and will attempt to follow your
+  system theme (light/dark) by default.
+• Optional support for KDE Frameworks, improving text editor behavior.
+• Window size and location can be saved and restored between sessions.
+• Monospace fonts are now properly used in the Agility interpreter.
+• Bleeps in the Z-machine are now supported.
+• Unifont is used to look up missing font glyphs.
+
+2022.1:
+• Gargoyle now implements Glk version 0.7.5.
+• Various interpreter updates.
+• The UI on Unix and Windows is now handled by Qt.
+• A new sound backend based on Qt is available.
+• Experimental support for the Haiku operating system.
+• SDL2 is now used instead of SDL1 (thanks to Manuel Stoeckl).
+• Built-in fonts are no longer supported due to licensing issues.
+• The default proportional font has been changed to Charis SIL (renamed to
+  “Gargoyle Serif”); the default monospace font is still Go Mono, renamed to
+  “Gargoyle Mono”.
+• Improved font rendering, including fine-grained control over FreeType’s
+  renderer (thanks to Tynach).
+• Improved font lookup on Fontconfig-based systems to avoid cases where the
+  wrong font styles were being used.
+• HiDPI is supported on macOS.
+
+2019.1.1:
+• Fix font selection on Windows.
+• Fix interpreter locating on FreeBSD.
+
+2019.1:
+• Many interpreters have been updated.
+• Text-to-speech support.
+• The built-in fonts support a much wider range of Unicode.
+• Full screen support.
+• Various accumulated small fixes and updates.
+
+2011.1:
+• Native ports are now available for Enlightenment and Open Inkpot.
+• Added Glk 0.7.1 features - line input echo and terminators, window border hint, Unicode decomposition and normalization.
+• Added Glk 0.7.2 features - date and time functions.
+• Added support for Treaty of Babel metadata.
+• Very small text buffers will now scroll properly.
+• Hyperlinks are now stored with all 32 bits.
+• The background color in grid windows will be fully applied.
+• The scrollback buffer will be truncated on window resize to improve responsiveness.
+• Games will no longer hang after launch under OS X 10.7 (Lion).
+• The bundled Liberation Mono fonts were incorrectly marked as proportional and have been updated.
+• Bocfel 0.6.0 added for Z-Machine stories.
+• Bocfel is now the default Z-Machine interpreter.
+• Glulxe is now the default Glulx interpreter for Superglús story files.
+• ScottFree 1.14 added for SAGA stories.
+• Command line flags for interpreters are now supported in garglk.ini
+• Interpreter updates: Alan 3 3.0b2, JACL 2.8.5, Glulxe 0.4.7, Git 1.2.9, Level9 5.1.
+• Frotz now handles the fixed width bit in the header correctly.
+• Frotz now repositions the cursor after writing to the final grid column.
+• Geas now displays menus correctly.
+• TADS now implements the banner API.
+• TADS now supports Unicode.
+• TADS now allows timer events during line and character input.

@@ -4,16 +4,16 @@
 	contains definitions and prototypes
 	for the Hugo Engine
 
-	Copyright (c) 1995-2006 by Kent Tessman
+	Copyright (c) 1995-2009 by Kent Tessman
 */
 
 
 #define HEVERSION 3
-#define HEREVISION 3
+#define HEREVISION 1
 #if !defined (COMPILE_V25)
-#define HEINTERIM ".0"
+#define HEINTERIM ".06"
 #else
-#define HEINTERIM ".0 (2.5)"
+#define HEINTERIM ".06 (2.5)"
 #endif
 
 #include <string.h>
@@ -277,8 +277,8 @@ void arc_colour(unsigned char n, unsigned int c);
 
 #include "glk.h"
 
-#ifdef GARGLK
-#undef WIN32 /* Gargoyle is not WinGlk */
+#ifdef HUGO_GLKUNIX
+extern char *hugo_path_to_game;
 #endif
 
 #define PORT_NAME "Glk"
@@ -355,11 +355,6 @@ void heglk_printfatalerror(char *err);
 #define SEEK_SET	seekmode_Start
 #undef SEEK_END
 #define SEEK_END	seekmode_End
-
-#if defined (_WINDOWS)
-#define SETTITLE_SUPPORTED
-#define PRINTFATALERROR_SUPPLIED
-#endif
 
 #endif /* defined (GLK) */
 
@@ -501,7 +496,11 @@ extern FILE *hugo_fopen (char *filename, char *mode);
 	by Kent Tessman
 ---------------------------------------------------------------------------*/
 
-#if defined (WIN32) && !defined (WXWINDOWS)
+// For some reason, CMake defines WIN32 when building with MSVC, even though
+// MSVC itself defines _WIN32, which is sufficient for determining if you're
+// on Windows. All these ports really ought to be mututally exclusive, but
+// for the time being, just don't do Windows-specific stuff here with Glk.
+#if defined (WIN32) && !defined (WXWINDOWS) && !defined (GLK)
 
 #ifdef UNDER_CE
 #define PORT_NAME "WinCE"
@@ -675,7 +674,7 @@ extern void srandom(int);
 #endif
 
 #if !defined (PRINTFATALERROR)
-#define PRINTFATALERROR(a)	fprintf(stderr, a)
+#define PRINTFATALERROR(a)	fprintf(stderr, "%s", a)
 #endif
 
 #ifndef OMIT_EXTRA_STRING_FUNCTIONS
@@ -693,8 +692,10 @@ int LoadGameData(char reload);
 /* To be used with caution; obviously, not all non-zero values are "true"
    in this usage.
 */
+#ifndef __cplusplus
 #define true 1
 #define false 0
+#endif
 
 /* These static values are not changeable--they depend largely on internals
    of the Engine.
@@ -707,7 +708,7 @@ int LoadGameData(char reload);
 #define MAXSTACKDEPTH    256	/* for nesting {...}		 */
 
 #if !defined (MAXUNDO)
-#define MAXUNDO          256	/* number of undoable operations */
+#define MAXUNDO          4096	/* number of undoable operations */
 #endif
 
 #if !defined (COMPILE_V25)
@@ -1187,9 +1188,6 @@ char *Mid(char *a, int pos, int n);
 char *Right(char *a, int l);
 char *Rtrim(char *a);
 #if defined (EXTRA_STRING_FUNCTIONS)
-#ifndef UNDER_CE
-int atoi(const char * str);
-#endif
 char *itoa(int a, char *buf, int base);
 char *strlwr(char *s);
 char *strnset(char *s, int c, size_t l);

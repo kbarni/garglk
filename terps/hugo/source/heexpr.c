@@ -14,7 +14,7 @@
 
 	for the Hugo Engine
 
-	Copyright (c) 1995-2006 by Kent Tessman
+	Copyright (c) 1995-2009 by Kent Tessman
 */
 
 
@@ -686,7 +686,15 @@ int GetVal()
 					ioerror = true;
 					retflag = true;
 				}
-				else val = low + high*256;
+				else
+				{
+				 	i = low + high*256;
+#if !defined (MATH_16BIT)
+					if (i > 32767)
+						i -= 65536;
+#endif
+					val = i;
+				}
 			}
 			codeptr++;
 			break;
@@ -893,6 +901,7 @@ CheckAttribute:
 			if (!inobj)
 				{nattr = 1;
 				codeptr++;}
+			/* fall through */
 		case IN_T:
 		{
 			if (!inobj)
@@ -1164,8 +1173,10 @@ void SetupExpr(void)
 			*/
 			case EOL_T:
 				arrexpr = false;
+				/* fall through */
 			case COMMA_T:
 				multiprop = false;
+				/* fall through */
 			case SEMICOLON_T:
 			case CLOSE_SQUARE_T:
 			case JUMP_T:

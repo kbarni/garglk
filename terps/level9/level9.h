@@ -1,11 +1,10 @@
 /***********************************************************************\
 *
 * Level 9 interpreter
-* Version 4.1
-* Copyright (c) 1996 Glen Summers
-* Copyright (c) 2002,2003 Glen Summers and David Kinder
-* Copyright (c) 2005,2007 Glen Summers, David Kinder, Alan Staniforth,
-* Simon Baldwin and Dieter Baron
+* Version 5.2
+* Copyright (c) 1996-2025 Glen Summers and contributors.
+* Contributions from David Kinder, Alan Staniforth, Simon Baldwin,
+* Dieter Baron and Andreas Scherrer.
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -19,34 +18,15 @@
 *
 * You should have received a copy of the GNU General Public License
 * along with this program; if not, write to the Free Software
-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111, USA.
 *
 \***********************************************************************/
 
-#include <limits.h>
+#include <stdint.h>
 
-#if UCHAR_MAX==0xff
-typedef unsigned char L9BYTE;
-#else
-#error "Can't find an 8-bit integer type"
-#endif
-
-#if SHRT_MAX==0x7fff
-typedef unsigned short L9UINT16;
-#elif INT_MAX==0x7fff
-typedef unsigned int   L9UINT16;
-#else
-#error "Can't find a 16-bit integer type"
-#endif
-
-#if INT_MAX==0x7fffffff
-typedef unsigned int L9UINT32;
-#elif LONG_MAX==0x7fffffff
-typedef unsigned long L9UINT32;
-#else
-#error "Can't find a 32-bit integer type"
-#endif
-
+typedef uint8_t L9BYTE;
+typedef uint16_t L9UINT16;
+typedef uint32_t L9UINT32;
 typedef int L9BOOL;
 
 #ifndef FALSE
@@ -140,6 +120,7 @@ void os_drawline(int x1, int y1, int x2, int y2, int colour1, int colour2);
 void os_fill(int x, int y, int colour1, int colour2);
 void os_show_bitmap(int pic, int x, int y);
 FILE* os_open_script_file(void);
+L9BOOL os_find_file(char* NewName);
 
 /* routines provided by level9 interpreter */
 L9BOOL LoadGame(char* filename, char* picname);
@@ -153,11 +134,6 @@ L9BOOL RunGraphics(void);
 /* bitmap routines provided by level9 interpreter */
 BitmapType DetectBitmaps(char* dir);
 Bitmap* DecodeBitmap(char* dir, BitmapType type, int num, int x, int y);
-
-#ifdef NEED_STRICMP_PROTOTYPE
-int stricmp(const char* str1, const char* str2);
-int strnicmp(const char* str1, const char* str2, size_t n);
-#endif
 
 #ifdef __cplusplus
 }

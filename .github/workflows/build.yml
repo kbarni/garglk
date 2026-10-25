@@ -1,0 +1,79 @@
+name: Feature matrix
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - feature: "-DSOUND=QT"
+            qt: 6
+          - feature: "-DSOUND=QT"
+            qt: 5
+          - feature: "-DSOUND=SDL2"
+            qt: 6
+          - feature: "-DSOUND=SDL3"
+            qt: 6
+          - feature: "-DWITH_TTS=OFF"
+            qt: 6
+          - feature: "-DIMAGES=SYSTEM"
+            qt: 6
+          - feature: "-DIMAGES=SYSTEM -DJPEGLIB=IJG"
+            qt: 6
+          - feature: "-DWITH_KDE=ON"
+            qt: 6
+
+    runs-on: ubuntu-latest
+    container:
+      image: amd64/ubuntu:26.04
+      options: --privileged
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Update packages
+        run: apt update
+
+      - name: Install packages
+        run: DEBIAN_FRONTEND=noninteractive apt install -y
+          build-essential
+          cmake
+          extra-cmake-modules
+          git
+          libfluidsynth-dev
+          libfmt-dev
+          libfontconfig1-dev
+          libfreetype-dev
+          libjpeg-dev
+          libkf6kio-dev
+          libkf6service-dev
+          libmpg123-dev
+          libopenmpt-dev
+          libsdl2-mixer-dev
+          libsdl3-dev
+          libsndfile-dev
+          libspeechd-dev
+          libturbojpeg0-dev
+          qt6-base-dev
+          qt6-base-dev-tools
+          qt6-multimedia-dev
+          qtbase5-dev
+          qtbase5-dev-tools
+          qtmultimedia5-dev
+
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_INSTALL_PREFIX=/usr ${{ matrix.feature }} -DWITH_INTERPRETERS=OFF -DWITH_LAUNCHER=OFF -DQT_VERSION=${{ matrix.qt }}
+
+      - name: Build
+        run: |
+          cd build
+          make -j`nproc`
+          make install DESTDIR=/tmp/gargoyle

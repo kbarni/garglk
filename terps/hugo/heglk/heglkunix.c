@@ -82,16 +82,18 @@ glkunix_startup_error (char *fmt, ...)
     }
   va_end (ap);
 }
-  
+
+char *hugo_path_to_game;
+
 int
 glkunix_startup_code (glkunix_startup_t *data)
 {
   char *base_name;
 
 #ifdef GARGLK
-  garglk_set_program_name("Hugo 3.3.0");
+  garglk_set_program_name("Hugo 3.1");
   garglk_set_program_info(
-	"Hugo 3.3.0 by Kent Tessman\n"
+	"Hugo 3.1 by Kent Tessman\n"
 	"Graphics support by Simon Baldwin\n"
 	"Sound support by Tor Andersson\n");
 #endif
@@ -104,12 +106,29 @@ glkunix_startup_code (glkunix_startup_t *data)
       return FALSE;
     }
 
+  char *s;
+  s = strrchr(data->argv[1], '/');
+  if (!s) s = strrchr(data->argv[1], '\\');
+
 #ifdef GARGLK
-    char *s;
-    s = strrchr(data->argv[1], '/');
-    if (!s) s = strrchr(data->argv[1], '\\');
-    garglk_set_story_name(s ? s + 1 : data->argv[1]);
+  garglk_set_story_name(s ? s + 1 : data->argv[1]);
 #endif
+
+  hugo_path_to_game = calloc(1, strlen(data->argv[1]) + 1);
+  if (hugo_path_to_game == NULL)
+    {
+      glkunix_startup_error ("Error: out of memory");
+      return FALSE;
+    }
+
+  if (s != NULL)
+    {
+      memcpy(hugo_path_to_game, data->argv[1], s - data->argv[1]);
+    }
+  else
+    {
+      strcpy(hugo_path_to_game, data->argv[1]);
+    }
 
   glkunix_set_base_file(data->argv[1]);
   game = glkunix_stream_open_pathname (data->argv[1], 0, 0);

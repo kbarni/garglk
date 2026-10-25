@@ -1,0 +1,110 @@
+# Helpers shared by windows.sh (MinGW) and msvc.sh (MSVC). Both
+# scripts populate build/dist with a Gargoyle binary and DLLs for
+# Windows; this file factors out the common DLL-copy logic.
+#
+# Sourced, not executed; assumes the cwd is the repo root (i.e. the
+# parent of build/dist).
+
+# Copy a Qt plugin to build/dist/plugins.
+#
+# Args:
+#   $1: Qt's plugins directory (e.g. "${qt}/plugins")
+#   $2: plugin path within that directory, no .dll extension
+#       (e.g. "imageformats/qjpeg")
+copy_plugin() {
+    local plugins_dir="${1}"
+    local plugin_path="${2}"
+    local subdir="${plugin_path%/*}"
+    mkdir -p "build/dist/plugins/${subdir}"
+    cp "${plugins_dir}/${plugin_path}.dll" "build/dist/plugins/${subdir}"
+}
+
+# Select a MinGW/LLVM objdump that understands all Windows PE arches.
+resolve_pe_objdump() {
+    if [[ -n "${MINGW_TRIPLE:-}" ]] && command -v "${MINGW_TRIPLE}-objdump" >/dev/null 2>&1
+    then
+        echo "${MINGW_TRIPLE}-objdump"
+    elif command -v llvm-objdump >/dev/null 2>&1
+    then
+        echo "llvm-objdump"
+    else
+        echo "objdump"
+    fi
+}
+
+# Print DLLs that something in build/dist loads at runtime via
+# LoadLibrary rather than importing, so they're invisible to objdump.
+#
+# sdl2-compat's SDL2.dll is a shim that LoadLibrary()s SDL3.dll and
+# forwards everything to it; classic SDL2 has no such string, so this
+# only fires for the compat build.
+runtime_loaded_dlls() {
+    if [[ -e build/dist/SDL2.dll ]] && grep -qa 'SDL3\.dll' build/dist/SDL2.dll
+    then
+        echo SDL3.dll
+    fi
+}
+
+# Recursively discover and copy DLL dependencies from all PE files in
+# build/dist (binaries and plugins). For each DLL named in any import
+# table, search for it and copy it into build/dist, then continue
+# scanning. DLLs not found in any search path are assumed to be provided
+# by Windows itself and silently skipped.
+#
+# The first argument is an explicit-Qt bin directory (from -Q), or empty
+# for a system build. Qt* DLLs are taken from there first so a plugin's
+# Qt libraries match the exact Qt build the plugin came from (Qt plugins
+# rely on private symbols). Every other DLL (libc++, zlib, …) prefers
+# the sysroot; otherwise a Qt-bundled stale libc++.dll would shadow the
+# sysroot's and break code using newer symbols. The Qt dir is still a
+# last-resort fallback for non-Qt deps that a Qt build ships
+# but the sysroot lacks.
+#
+# Args:
+#   $1:   explicit-Qt bin dir, or "" for a system build
+#   $2..: sysroot directories to search for DLLs
+copy_dll_deps() {
+    local qt_dir="$1"
+    shift
+    local search_paths=("$@")
+    local pe_objdump
+    pe_objdump=$(resolve_pe_objdump)
+    local copied=0
+    while true
+    do
+        local changed=false
+        local dll
+        while IFS= read -r dll
+        do
+            [[ -e "build/dist/${dll}" ]] && continue
+            local dirs
+            if [[ -n "${qt_dir}" && "${dll}" == Qt*.dll ]]
+            then
+                dirs=("${qt_dir}" "${search_paths[@]}")
+            elif [[ -n "${qt_dir}" ]]
+            then
+                dirs=("${search_paths[@]}" "${qt_dir}")
+            else
+                dirs=("${search_paths[@]}")
+            fi
+            local dir
+            for dir in "${dirs[@]}"
+            do
+                if [[ -e "${dir}/${dll}" ]]
+                then
+                    cp "${dir}/${dll}" build/dist
+                    changed=true
+                    copied=$((copied + 1))
+                    break
+                fi
+            done
+        done < <({ find build/dist \( -iname "*.exe" -o -iname "*.dll" \) -exec "${pe_objdump}" -p {} + 2>/dev/null | sed -n "s/.*DLL Name: //p"; runtime_loaded_dlls; } | sort -u)
+        $changed || break
+    done
+    if [[ "${copied}" -eq 0 ]]
+    then
+        echo "error: copy_dll_deps found no copyable DLL dependencies (using ${pe_objdump})" >&2
+        "${pe_objdump}" -p build/dist/libgarglk.dll 2>&1 | head -5 >&2 || true
+        return 1
+    fi
+}

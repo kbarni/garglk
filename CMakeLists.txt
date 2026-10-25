@@ -1,50 +1,97 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.12)
 
-project(garglk VERSION 2017)
-include(GNUInstallDirs)
-include(CheckIPOSupported)
+file(READ "VERSION" GARGOYLE_VERSION)
+string(STRIP "${GARGOYLE_VERSION}" GARGOYLE_VERSION)
 
-option(COMPILE_FOR_KINDLE "Compile for target platform Kindle." off)
-option(ENABLE_ALT_MOUSE_HANDLING "Enable alternative gtk mouse handling optimized for touch devices like Kindle." off)
-option(WITH_BABEL "Display Treaty of Babel-derived author and title if possible." ON)
-option(WITH_SDL "Use SDL for sound support." off)
+# Don't set a version here: CMake requires a version of the form
+# <major>[.<minor>[.<patch>[.<tweak>]]]
+# where all parts are non-negative integers. This doesn't work with
+# CI builds which include the current Git revision as the version.
+project(garglk)
 
-if(ENABLE_ALT_MOUSE_HANDLING)
-  message(STATUS "Alternative gtk mouse handling enabled.")
-  add_definitions(-D_ALT_MOUSE_HANDLING)
+if(POLICY CMP0069)
+    cmake_policy(SET CMP0069 NEW)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT HAS_LTO)
 endif()
 
-if(COMPILE_FOR_KINDLE)
-  message(STATUS "Setting definitions for Kindle target.")
-  add_definitions(-D_GNU_SOURCE)
-  add_definitions(-D_KINDLE)
-  add_definitions(-D_ALT_MOUSE_HANDLING)
-  add_link_options("LINKER:-unresolved-symbols=ignore-in-shared-libs")
-endif(COMPILE_FOR_KINDLE)
-
-if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-  # Check for link-time-optimization support and enable if present.
-  check_ipo_supported(RESULT hasIpoSupport OUTPUT ipoSupportCheckResultErrorMessage)
-  if(hasIpoSupport)
-    message(STATUS "IPO is supported and will be eabled.")
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-  else()
-    message(WARNING "IPO is not supported: ${ipoSupportCheckResultErrorMessage}")
-  endif()
+# CMake claims C++17 support for g++7, but std::filesystem isn't available
+# there. In fact, proper std::filesystem support didn't land in gcc till
+# version 9 (see https://gcc.gnu.org/gcc-9/changes.html).
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9")
+    message(FATAL_ERROR "Compiler too old (insufficient C++17 support)")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 include(Compilers)
 
+option(WITH_INTERPRETERS "Build the included interpreters" ON)
+option(WITH_BABEL "Display Treaty of Babel-derived author and title if possible" ON)
+option(APPIMAGE "Tweak some settings to aid in AppImage building" OFF)
+option(DIST_INSTALL "Install to ${PROJECT_SOURCE_DIR}/build/dist for packaging" OFF)
+
+# Windows has no rpath, and no separate interpreter directory: the
+# launcher looks for interpreters next to itself, and both it and they
+# need libgarglk alongside as well. Put all runtime output in a single
+# directory so the build tree can be run in place, without installing.
+# Multi-config generators append a per-configuration subdirectory to
+# this, so Debug and Release still don't collide.
+if(WIN32 AND NOT DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+endif()
+
+if(MSVC)
+    # MSVC defaults to the equivalent of "-fvisibility=hidden", which the code is not set up to support.
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    include_directories("win32compat")
+    add_compile_definitions("_CRT_SECURE_NO_WARNINGS")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        add_compile_options("-Wno-everything" "-Wall" "-Wextra" "-ferror-limit=100"
+            "-Wno-unused-parameter"
+            "-Wno-sign-compare"
+            "-Wno-missing-field-initializers"
+            "-Wno-ignored-qualifiers"
+            "-Wno-null-pointer-subtraction"
+            "-Wno-unterminated-string-initialization"
+            "-Wno-deprecated-copy-with-user-provided-copy"
+            "-Wno-string-concatenation"
+        )
+    endif()
+endif()
+
+if(UNIX AND NOT DIST_INSTALL)
+    include(GNUInstallDirs)
+    if(APPIMAGE)
+        set(INTERPRETER_INSTALL_DIR "${CMAKE_INSTALL_FULL_BINDIR}")
+        set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
+    else()
+        set(INTERPRETER_INSTALL_DIR "${CMAKE_INSTALL_FULL_LIBEXECDIR}/gargoyle")
+    endif()
+endif()
+
+# These two are declared here rather than in terps/ because the launcher needs
+# to know whether they were built: each takes precedence over Scarier for the
+# ADRIFT format it handles.
+option(WITH_SCARE "Build the SCARE interpreter (ADRIFT 3.8, 3.9, and 4)" OFF)
+option(WITH_FRANKENDRIFT "Build the FrankenDrift interpreter for ADRIFT 5 games (requires the .NET 8 SDK)" OFF)
 add_subdirectory(garglk)
-add_subdirectory(terps)
-add_subdirectory(tads)
+
+if(WITH_FRANKENDRIFT AND NOT BUILD_SHARED_LIBS)
+    message(FATAL_ERROR "Frankendrift requires a shared libgarglk")
+endif()
+
+add_subdirectory(support/xbrz)
+add_subdirectory(support/xbrz-null)
+add_subdirectory(support/hqx)
+
+if(WITH_INTERPRETERS)
+    add_subdirectory(terps)
+endif()
 
 if(WITH_BABEL)
-  add_subdirectory(support/babel)
+    add_subdirectory(support/babel)
 endif()
 
-if(WITH_SDL AND MINGW)
-  add_subdirectory(support/sdl_sound)
-endif()
+include(FeatureSummary)
+feature_summary(WHAT ALL)

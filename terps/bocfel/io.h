@@ -1,41 +1,164 @@
+// vim: set ft=cpp:
+
 #ifndef ZTERP_IO_H
 #define ZTERP_IO_H
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stdbool.h>
+#include <cstdio>
+#include <exception>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
-typedef struct zterp_io zterp_io;
+#ifdef ZTERP_GLK
+extern "C" {
+#include <glk.h>
+}
+#endif
 
-enum zterp_io_mode
-{
-  ZTERP_IO_RDONLY,
-  ZTERP_IO_WRONLY,
-  ZTERP_IO_APPEND,
+#include "types.h"
+
+enum class StreamRock : uint32_t {
+    None = 0,
+    BlorbStream = 1,
+    TranscriptStream = 2,
 };
 
-enum zterp_io_purpose
-{
-  ZTERP_IO_DATA,
-  ZTERP_IO_SAVE,
-  ZTERP_IO_TRANS,
-  ZTERP_IO_INPUT,
-};
+class IO {
+public:
+    class Error : public std::exception {
+    };
 
-zterp_io *zterp_io_open(const char *, enum zterp_io_mode, enum zterp_io_purpose);
-const zterp_io *zterp_io_stdin(void);
-const zterp_io *zterp_io_stdout(void);
-void zterp_io_close(zterp_io *);
-bool zterp_io_seek(const zterp_io *, long, int);
-long zterp_io_tell(const zterp_io *);
-size_t zterp_io_read(const zterp_io *, void *, size_t);
-size_t zterp_io_write(const zterp_io *, const void *, size_t);
-bool zterp_io_read16(const zterp_io *, uint16_t *);
-bool zterp_io_read32(const zterp_io *, uint32_t *);
-long zterp_io_getc(const zterp_io *);
-void zterp_io_putc(const zterp_io *, uint16_t);
-long zterp_io_readline(const zterp_io *, uint16_t *, size_t);
-long zterp_io_filesize(const zterp_io *);
-void zterp_io_flush(const zterp_io *);
+    class OpenError : public Error {
+    };
+
+    class IOError : public Error {
+    };
+
+    class EndOfFile : public Error {
+    };
+
+    enum class Mode {
+        ReadOnly,
+        WriteOnly,
+        Append,
+    };
+
+    enum class Purpose {
+        Data,
+        Save,
+        Transcript,
+        Input,
+    };
+
+    enum class SeekFrom {
+        Start,
+        End,
+        Current,
+    };
+
+    IO(const std::optional<std::string> &filename, Mode mode, Purpose purpose, StreamRock namedglkrock = StreamRock::None);
+    IO(std::vector<uint8_t> buf, Mode mode);
+#ifdef ZTERP_GLK
+    IO(Mode mode, Purpose purpose, strid_t stream) : m_file(stream), m_type(Type::Glk), m_mode(mode), m_purpose(purpose) {
+    }
+#endif
+
+    void operator=(IO const &) = delete;
+    IO(const IO &) = delete;
+    IO(IO &&) = default;
+
+    static IO standard_in() {
+        return IO(stdin, Mode::ReadOnly, Purpose::Input, false);
+    }
+
+    static IO standard_out() {
+        return IO(stdout, Mode::WriteOnly, Purpose::Transcript, false);
+    }
+
+    [[nodiscard]] const std::vector<uint8_t> &get_memory() const;
+
+    void seek(long offset, SeekFrom whence);
+    [[nodiscard]] long tell() const;
+    size_t read(void *buf, size_t n);
+    void read_exact(void *buf, size_t n);
+    size_t write(const void *buf, size_t n);
+    void write_exact(const void *buf, size_t n);
+    uint8_t read8();
+    uint16_t read16();
+    uint32_t read32();
+    void write8(uint8_t v);
+    void write16(uint16_t v);
+    void write32(uint32_t v);
+    std::optional<uint32_t> getc(bool limit16);
+    void putc(uint32_t c);
+    std::vector<uint16_t> readline();
+    std::optional<unsigned long> filesize() const;
+    void flush();
+
+private:
+    struct Backing {
+        std::vector<uint8_t> memory;
+        long offset = 0;
+
+        Backing() = default;
+
+        explicit Backing(std::vector<uint8_t> buf) : memory(std::move(buf)) {
+        }
+    };
+
+    enum class Type {
+        StandardIO,
+        Memory,
+#ifdef ZTERP_GLK
+        Glk,
+#endif
+    };
+
+    using StdioType = std::unique_ptr<std::FILE, std::function<void(std::FILE *)>>;
+
+#ifdef ZTERP_GLK
+    using GlkType = std::unique_ptr<std::remove_pointer_t<strid_t>, std::function<void(strid_t)>>;
+#endif
+
+    struct File {
+        StdioType stdio;
+        Backing backing;
+#ifdef ZTERP_GLK
+        GlkType glk;
+#endif
+
+        File() = default;
+
+        File(std::FILE *fp, bool close) : stdio(StdioType(fp, [close](std::FILE *fp_) { if (close) { std::fclose(fp_); } })) {
+        }
+
+        explicit File(std::vector<uint8_t> buf) : backing(std::move(buf)) {
+        }
+
+#ifdef ZTERP_GLK
+        explicit File(strid_t stream) : glk(GlkType(stream, [](strid_t str) { glk_stream_close(str, nullptr); })) {
+        }
+#endif
+    };
+
+    IO(std::FILE *fp, Mode mode, Purpose purpose, bool close) : m_file(fp, close), m_type(Type::StandardIO), m_mode(mode), m_purpose(purpose) {
+    }
+
+    [[noreturn]] void bad_type() const;
+    bool textmode() const;
+
+#ifdef ZTERP_GLK
+    void open_as_glk(const std::function<frefid_t(glui32 usage, glui32 filemode)> &create_fref, StreamRock rock);
+#endif
+
+    File m_file;
+    Type m_type;
+    Mode m_mode;
+    Purpose m_purpose;
+};
 
 #endif

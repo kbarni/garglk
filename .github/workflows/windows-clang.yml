@@ -1,0 +1,89 @@
+name: Clang on Windows
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        arch:
+          - x86-64
+        #  - arm64
+
+    runs-on: windows-2022
+
+    env:
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure vcpkg binary caching
+        shell: pwsh
+        run: |
+          &$(C:\vcpkg\vcpkg.exe fetch nuget | Select-Object -Last 1) `
+            sources add `
+            -Source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" `
+            -StorePasswordInClearText `
+            -Name GitHubPackages `
+            -UserName "${{ github.repository_owner }}" `
+            -Password "${{ secrets.GITHUB_TOKEN }}"
+          &$(C:\vcpkg\vcpkg.exe fetch nuget | Select-Object -Last 1) `
+            setapikey "${{ secrets.GITHUB_TOKEN }}" `
+            -Source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.*'
+          arch: win64_msvc2022_${{ fromJSON('{"x86-64":"64","arm64":"arm64"}')[matrix.arch] || matrix.arch }}
+          modules: 'qtmultimedia'
+
+      - name: Install other packages
+        run: vcpkg install freetype libsndfile mpg123 libopenmpt libjpeg-turbo fluidsynth --triplet ${{ fromJSON('{"x86-64":"x64","arm64":"arm64"}')[matrix.arch] || matrix.arch }}-windows
+
+      - name: Set up Visual Studio environment
+        uses: seanmiddleditch/gha-setup-vsdevenv@v5
+        with:
+          arch: ${{ fromJSON('{"x86-64":"amd64","arm64":"arm64"}')[matrix.arch] || matrix.arch }}
+          host_arch: 'amd64'
+
+      - name: Fix LLVM version issue
+        run: choco upgrade llvm
+
+      - name: Build (x64)
+        if: ${{ matrix.arch == 'x86-64' }}
+        run: |
+          mkdir cmake-build
+          cd cmake-build
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_LINKER=lld-link -DINTERFACE=QT -DQT_VERSION=6 -DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DSOUND=QT -DWITH_FRANKENDRIFT=ON -DDIST_INSTALL=ON ..
+          ninja
+
+      - name: Assemble results
+        run: |
+          mkdir gargoyle-staging
+          cp cmake-build\*.exe gargoyle-staging
+          cp cmake-build\*.dll gargoyle-staging
+          cp cmake-build\*.ttf gargoyle-staging
+          cp cmake-build\*.otf gargoyle-staging
+
+      - name: Deploy Qt files
+        run: |
+          cd gargoyle-staging
+          windeployqt --no-quick-import --no-compiler-runtime --no-system-d3d-compiler garglk.dll
+
+      - name: Compress
+        run: Compress-Archive -Path gargoyle-staging -DestinationPath gargoyle-win-clang-fd-${{ matrix.arch }}.zip
+
+      - name: Upload archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: gargoyle-win-clang-${{ matrix.arch }}.zip
+          path: gargoyle-*.zip

@@ -1,98 +1,176 @@
+// vim: set ft=cpp:
+
 #ifndef ZTERP_SCREEN_H
 #define ZTERP_SCREEN_H
 
-#include <stdint.h>
-#include <stdbool.h>
+#include <bitset>
+#include <string>
+#include <utility>
 
 #ifdef ZTERP_GLK
+extern "C" {
 #include <glk.h>
+}
 #endif
 
+#include "iff.h"
+#include "io.h"
+#include "stack.h"
+#include "types.h"
 #include "util.h"
 
-/* Boolean flag describing whether the header bit meaning “fixed font” is set. */
-extern bool header_fixed_font;
+// Represents a Z-machine color.
+//
+// If mode is ANSI, value is a color in the range [1, 12], representing
+// the colors as described in §8.3.1.
+//
+// If mode is True, value is a 15-bit color as described in §8.3.7 and
+// §15.
+struct Color {
+    enum class Mode { ANSI, True } mode;
+    uint16_t value;
 
-void init_screen(void);
+    Color() : mode(Mode::ANSI), value(1) {
+    }
 
-bool create_mainwin(void);
-bool create_statuswin(void);
-bool create_upperwin(void);
-void get_screen_size(unsigned int *, unsigned int *);
-void close_upper_window(void);
-void cancel_all_events(void);
+    Color(Mode mode_, uint16_t value_) : mode(mode_), value(value_) {
+    }
 
-/* Text styles. */
-#define STYLE_NONE	(0U     )
-#define STYLE_REVERSE	(1U << 0)
-#define STYLE_BOLD	(1U << 1)
-#define STYLE_ITALIC	(1U << 2)
-#define STYLE_FIXED	(1U << 3)
+    uint16_t as_zcolor() const {
+        // For now, true color returns default.
+        if (mode == Mode::True) {
+            return 1;
+        }
+
+        return value;
+    }
+};
+
+void init_screen(bool first_run);
+
+bool create_mainwin();
+void create_graphicswin();
+void create_statuswin();
+bool have_statuswin();
+void create_upperwin();
+bool have_upperwin();
+std::pair<unsigned int, unsigned int> get_screen_size();
+void close_upper_window();
+
+uint32_t screen_convert_color(uint16_t color);
+
+// Text styles.
+using Style = std::bitset<4>;
+
+enum StyleBit {
+    STYLE_REVERSE = 0,
+    STYLE_BOLD    = 1,
+    STYLE_ITALIC  = 2,
+    STYLE_FIXED   = 3,
+};
 
 zprintflike(1, 2)
-void show_message(const char *, ...);
-void screen_print(const char *);
+void show_message(const char *fmt, ...);
+void screen_print(const std::string &s);
+void screen_putc(uint32_t c);
 zprintflike(1, 2)
-void screen_printf(const char *, ...);
-void screen_puts(const char *);
+void screen_printf(const char *fmt, ...);
+void screen_puts(const std::string &s);
+void screen_message_prompt(const std::string &message);
+void screen_flush();
 
-#ifdef GLK_MODULE_LINE_TERMINATORS
-void term_keys_reset(void);
-void term_keys_add(uint8_t);
+// Whether text windows can float over pictures; see the V6 patches.
+bool screen_has_overlays();
+
+#ifdef ZTERP_GLK
+
+void screen_clean_up_glk_streams();
+void screen_recover_glk_windows();
+void screen_recover_glk_streams();
+
+#ifdef GLK_MODULE_GARGLKTEXT
+void update_color(int which, unsigned long color);
 #endif
 
-#ifdef GARGLK
-void update_color(int, unsigned long);
+#ifdef ZTERP_GLK_BLORB
+void screen_load_scale_info();
 #endif
 
-/* Output streams. */
-#define OSTREAM_SCREEN		1
-#define OSTREAM_SCRIPT		2
-#define OSTREAM_MEMORY		3
-#define OSTREAM_RECORD		4
+#endif
 
-/* Input streams. */
-#define ISTREAM_KEYBOARD	0
-#define ISTREAM_FILE		1
+// Output streams.
+enum : int {
+    OSTREAM_SCREEN     = 1,
+    OSTREAM_TRANSCRIPT = 2,
+    OSTREAM_MEMORY     = 3,
+    OSTREAM_RECORD     = 4,
+};
 
-bool output_stream(int16_t, uint16_t);
-bool input_stream(int);
+// Input streams.
+enum : int {
+    ISTREAM_KEYBOARD = 0,
+    ISTREAM_FILE     = 1,
+};
 
-void set_current_style(void);
+void screen_set_header_bit(bool set);
 
-int print_handler(uint32_t, void (*)(uint8_t));
-void put_char_u(uint16_t);
-void put_char(uint8_t);
+bool output_stream(int16_t number, uint16_t table);
+bool input_stream(int which);
 
-void zoutput_stream(void);
-void zinput_stream(void);
-void zprint(void);
-void zprint_ret(void);
-void znew_line(void);
-void zerase_window(void);
-void zerase_line(void);
-void zset_cursor(void);
-void zget_cursor(void);
-void zset_colour(void);
-void zset_true_colour(void);
-void zset_text_style(void);
-void zset_font(void);
-void zprint_table(void);
-void zprint_char(void);
-void zprint_num(void);
-void zprint_addr(void);
-void zprint_paddr(void);
-void zsplit_window(void);
-void zset_window(void);
-void zread_char(void);
-void zshow_status(void);
-void zread(void);
-void zprint_unicode(void);
-void zcheck_unicode(void);
-void zpicture_data(void);
-void zget_wind_prop(void);
-void zprint_form(void);
-void zmake_menu(void);
-void zbuffer_screen(void);
+int print_handler(uint32_t addr, void (*outc)(uint8_t));
+void put_char(uint8_t c);
+
+std::string screen_format_time(long hours, long minutes);
+void screen_read_scrn(IO &io, uint32_t size);
+IFF::TypeID screen_write_scrn(IO &io);
+void screen_read_bfhs(IO &io, SaveType savetype);
+IFF::TypeID screen_write_bfhs(IO &io);
+void screen_read_bfts(IO &io, uint32_t size);
+IFF::TypeID screen_write_bfts(IO &io);
+void screen_save_persistent_transcript();
+void screen_show_persistent_transcript();
+
+bool screen_toggle_force_fixed();
+
+void zoutput_stream();
+void zinput_stream();
+void zprint();
+void znew_line();
+void zprint_ret();
+void zerase_window();
+void zerase_line();
+void zset_cursor();
+void zget_cursor();
+void zset_colour();
+void zset_true_colour();
+void zset_text_style();
+void zset_font();
+void zprint_table();
+void zprint_char();
+void zprint_num();
+void zprint_addr();
+void zprint_paddr();
+void zsplit_window();
+void zset_window();
+void zread_char();
+void zshow_status();
+void zread();
+void zprint_unicode();
+void zcheck_unicode();
+void zdraw_picture();
+void zpicture_data();
+void zmove_window();
+void zwindow_size();
+void zwindow_style();
+void zget_wind_prop();
+void zscroll_window();
+void zprint_form();
+void zmake_menu();
+void zbuffer_screen();
+
+void zjourney_dial();
+void zshogun_menu();
+void zshogun_flush_old_picture();
+void zzork0_define();
 
 #endif

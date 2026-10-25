@@ -1,154 +1,617 @@
-set(SRCS babeldata.c cgblorb.c cgdate.c cgfref.c cggestal.c cgmisc.c cgstream.c
-    cgstyle.c cgunicod.c config.c draw.c event.c fontdata.c gi_blorb.c
-    gi_dispa.c imgload.c imgscale.c winblank.c window.c wingfx.c wingrid.c
-    winmask.c winpair.c wintext.c)
+include(vtkEncodeString)
 
-option(WITH_BUNDLED_FONTS "Embed default fonts into Gargoyle." ON)
-option(WITH_TTS "Enable text-to-speech support." OFF)
+configure_file("garversion.h.in" "${CMAKE_CURRENT_BINARY_DIR}/garversion.h")
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-set(GARGLKINI "/etc/garglk.ini" CACHE STRING "Full path for garglk.ini.")
-set(GARGLKPRE "" CACHE STRING "Binary prefix.")
+option(WITH_LAUNCHER "Build the launcher (i.e. the gargoyle executable)" ON)
+option(BUILD_SHARED_LIBS "Build a shared libgarglk instead of a static library" ON)
+option(WITH_BUNDLED_FMT "Use Gargoyle's bundled fmt library instead of the system's fmt library" OFF)
 
-if(UNIX)
-  set(GUILIB "GTK" CACHE STRING "Select GUILIB. Options: GTK, EFL.")
+if(UNIX AND NOT APPLE)
+    option(WITH_FREEDESKTOP "Install freedesktop.org application, icon, and MIME files" ON)
+    option(WITH_X11_FONTS "Support naming fonts by X Logical Font Description" ON)
+    set(GARGLKINI "${CMAKE_INSTALL_FULL_SYSCONFDIR}/garglk.ini")
+    if(NOT APPIMAGE)
+        option(INSTALL_GARGLKINI "Install an example config file to ${GARGLKINI}" OFF)
+    endif()
+    option(INSTALL_DEV "Install development files (headers, pkg-config file)" OFF)
+endif()
 
-  find_package(PkgConfig REQUIRED)
-
-  pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
-  find_package(Freetype REQUIRED)
-  find_package(JPEG REQUIRED)
-  find_package(PNG REQUIRED)
-  list(APPEND GARGLK_INCLUDES ${FONTCONFIG_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} ${JPEG_INCLUDE_DIR} ${PNG_INCLUDE_DIRS})
-  list(APPEND GARGLK_LIBS ${FONTCONFIG_LIBRARIES} ${FREETYPE_LIBRARIES} ${JPEG_LIBRARIES} ${PNG_LIBRARIES})
-elseif(MINGW)
-  # On Windows, the only GUILIB currently supported is MinGW, so don't
-  # pretend that there are choices available.
-  set(GUILIB "MINGW32")
+if(APPLE)
+    set(INTERFACE "COCOA" CACHE STRING "Interface to use (COCOA or QT)")
 else()
-  message(FATAL_ERROR "Unsupported platform (${CMAKE_SYSTEM_NAME}).")
+    set(INTERFACE "QT" CACHE STRING "Interface to use (QT or KINDLE)")
 endif()
 
-if(COMPILE_FOR_KINDLE)
-  message(STATUS "Setting include and lib dirs for Kindle lipc integration.")
-  list(APPEND GARGLK_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../support/kindle/lipc/include)
-  list(APPEND GARGLK_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../support/kindle/lipc/lib/liblipc.so)
-  add_link_options("LINKER:-unresolved-symbols=ignore-in-shared-libs")
-endif(COMPILE_FOR_KINDLE)
-
-set(SOUND_SOURCE sndnull.c)
-if(WITH_SDL)
-  if(UNIX)
-    find_package(SDL REQUIRED)
-    find_package(SDL_mixer REQUIRED)
-    find_package(SDL_sound REQUIRED)
-    list(APPEND GARGLK_INCLUDES ${SDL_INCLUDE_DIR} ${SDL_MIXER_INCLUDE_DIRS} ${SDL_SOUND_INCLUDE_DIRS})
-    # NOTE: This should be ${SDL_SOUND_LIBRARIES} but that gets clobbered in FindSDL_sound
-    list(APPEND GARGLK_LIBS ${SDL_LIBRARY} ${SDL_MIXER_LIBRARIES} ${SDL_SOUND_LIBRARY})
-    set(SOUND_SOURCE sndsdl.c)
-  elseif(MINGW)
-    list(APPEND GARGLK_INCLUDES ../support/sdl ../support/sdl_sound)
-    list(APPEND GARGLK_LIBS sdl_sound)
-    list(APPEND GARGLK_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../support/sdl/SDL.dll)
-    list(APPEND GARGLK_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../support/sdl/SDL_mixer.dll)
-    list(APPEND GARGLK_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../support/sdl/smpeg.dll)
-    list(APPEND GARGLK_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../support/sdl/libvorbisfile-3.dll)
-    set(SOUND_SOURCE sndsdl.c)
-  endif()
+if(INTERFACE STREQUAL "QT")
+    set(SOUND_DEFAULT "QT")
+    set(IMAGES_DEFAULT "QT")
+    option(WITH_NATIVE_FILE_DIALOGS "Use native dialogs instead of Qt dialogs" ON)
+elseif(INTERFACE STREQUAL "KINDLE")
+    set(SOUND_DEFAULT "NONE")
+    set(IMAGES_DEFAULT "SYSTEM")
+else()
+    set(SOUND_DEFAULT "SDL3")
+    set(IMAGES_DEFAULT "SYSTEM")
 endif()
-list(APPEND SRCS ${SOUND_SOURCE})
 
-if(WITH_BUNDLED_FONTS)
-  list(APPEND GARGLK_DEFINITIONS PRIVATE BUNDLED_FONTS)
+set(WITH_TTS "AUTO" CACHE STRING "Enable text-to-speech support (ON/OFF/AUTO/DYNAMIC)")
+set(GARGLKPRE "" CACHE STRING "Binary prefix")
+
+set(SOUND "${SOUND_DEFAULT}" CACHE STRING "Backend to use for sound (SDL2, SDL3, QT, or NONE)")
+# "SDL" was the name of the sole SDL backend before the SDL2/SDL3 split; keep
+# accepting it as an alias for SDL2 so existing build scripts keep working.
+if(SOUND STREQUAL "SDL")
+    set(SOUND "SDL2")
 endif()
+
+set(IMAGES "${IMAGES_DEFAULT}" CACHE STRING "Backend to use for image loading (SYSTEM {for system libraries} or QT)")
+set_property(CACHE IMAGES PROPERTY STRINGS SYSTEM QT)
+set(JPEGLIB "AUTO" CACHE STRING "JPEG library to use (TURBO, IJG, or AUTO); ignored if IMAGES set to QT")
+
+if(NOT IMAGES STREQUAL "SYSTEM" AND NOT IMAGES STREQUAL "QT")
+    message(FATAL_ERROR "IMAGES must be either SYSTEM or QT")
+endif()
+
+if(IMAGES STREQUAL "QT" AND NOT INTERFACE STREQUAL "QT")
+    message(FATAL_ERROR "IMAGES=QT requires INTERFACE=QT")
+endif()
+
+if(SOUND STREQUAL "SDL2" OR SOUND STREQUAL "SDL3" OR SOUND STREQUAL "QT")
+    set(DEFAULT_SOUNDFONT "" CACHE STRING "Path to a soundfont to use by default (defaults to empty, i.e. no default soundfont)")
+endif()
+
+if(MSVC)
+    vtk_encode_string(
+        INPUT garglk.ini
+        NAME garglkini
+        HEADER_OUTPUT GARGLKINI_H
+        SOURCE_OUTPUT GARGLKINI_CXX
+        EXPORT_SYMBOL "GARGLK_API"
+        EXPORT_HEADER "garglk_importexport.h"
+    )
+else()
+    vtk_encode_string(
+        INPUT garglk.ini
+        NAME garglkini
+        HEADER_OUTPUT GARGLKINI_H
+        SOURCE_OUTPUT GARGLKINI_CXX
+    )
+endif()
+
+set_property(SOURCE config.cpp launchqt.cpp APPEND PROPERTY COMPILE_DEFINITIONS GARGLKINI_H="${GARGLKINI_H}")
+
+vtk_encode_string(
+    INPUT ../themes/dark.json
+    NAME theme_dark
+    HEADER_OUTPUT THEME_DARK_H
+    SOURCE_OUTPUT THEME_DARK_CXX
+)
+
+vtk_encode_string(
+    INPUT ../themes/light.json
+    NAME theme_light
+    HEADER_OUTPUT THEME_LIGHT_H
+    SOURCE_OUTPUT THEME_LIGHT_CXX
+)
+
+set_property(SOURCE theme.cpp APPEND PROPERTY COMPILE_DEFINITIONS THEME_DARK_H="${THEME_DARK_H}" THEME_LIGHT_H="${THEME_LIGHT_H}")
+
+if(INTERFACE STREQUAL "QT")
+    set(CMAKE_AUTOMOC ON)
+    set_property(SOURCE ${GARGLKINI_CXX} ${THEME_DARK_CXX} ${THEME_DARK_H} ${THEME_LIGHT_CXX} ${THEME_LIGHT_H} PROPERTY SKIP_AUTOMOC ON)
+
+    if(NOT WITH_NATIVE_FILE_DIALOGS)
+        set_property(SOURCE sysqt.cpp launchqt.cpp APPEND PROPERTY COMPILE_DEFINITIONS GARGLK_CONFIG_NO_NATIVE_FILE_DIALOGS)
+    endif()
+endif()
+
+if(IMAGES STREQUAL "QT")
+    set(IMGLOAD imgload-qt.cpp)
+else()
+    set(IMGLOAD imgload-system.cpp)
+endif()
+
+add_library(garglk-common OBJECT babeldata.cpp style.cpp config.cpp draw.cpp event.cpp
+    garglk.cpp imgload.cpp ${IMGLOAD} imgscale.cpp theme.cpp winblank.cpp window.cpp
+    wingfx.cpp wingrid.cpp winmask.cpp winpair.cpp wintext.cpp zbleep.cpp
+    ${GARGLKINI_CXX} ${THEME_DARK_CXX} ${THEME_LIGHT_CXX}
+
+    # These can't be a library in cheapglk/ because they contain
+    # references to code in garglk, and garglk contains references to
+    # cheapglk (i.e. circular dependencies). That's fine with shared
+    # libraries, but will fail with static libraries. These are pulled
+    # from cheapglk and kept separate logically, but they're really a
+    # part of garglk itself, so add them directly to the garglk target.
+    cheapglk/cgblorb.cpp cheapglk/cgdate.cpp cheapglk/cgfref.cpp
+    cheapglk/cggestal.cpp cheapglk/cgmisc.cpp cheapglk/cgstream.cpp
+    cheapglk/cgunicod.cpp cheapglk/gi_blorb.c cheapglk/gi_dispa.c)
+
+set_target_properties(garglk-common PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+
+target_include_directories(garglk-common PRIVATE .)
+
+c_standard(garglk-common 11)
+cxx_standard(garglk-common 17)
+warnings(garglk-common)
+
+if(UNIX AND NOT APPLE)
+    target_compile_definitions(garglk-common PRIVATE "GARGLKINI=\"${GARGLKINI}\"")
+    target_compile_definitions(garglk-common PRIVATE "GARGLK_CONFIG_DATADIR=\"${CMAKE_INSTALL_FULL_DATAROOTDIR}/gargoyle\"")
+endif()
+
+if(DEFAULT_SOUNDFONT)
+    target_compile_definitions(garglk-common PRIVATE "GARGLK_DEFAULT_SOUNDFONT=\"${DEFAULT_SOUNDFONT}\"")
+endif()
+
+if(APPIMAGE)
+    target_compile_definitions(garglk-common PRIVATE GARGLK_CONFIG_APPIMAGE)
+endif()
+
+if(INTERFACE STREQUAL "COCOA")
+    target_sources(garglk-common PRIVATE sysmac.mm)
+    target_compile_options(garglk-common PRIVATE "-Wno-deprecated-declarations")
+elseif(INTERFACE STREQUAL "KINDLE")
+    target_sources(garglk-common PRIVATE kindle/syskindle.cpp kindle/browser.cpp kindle/keyboard.cpp kindle/l10n.cpp kindle/ui.cpp)
+else()
+    target_sources(garglk-common PRIVATE sysqt.cpp)
+    find_package(Threads REQUIRED)
+    target_link_libraries(garglk-common PRIVATE ${CMAKE_THREAD_LIBS_INIT})
+endif()
+
+find_package(Freetype REQUIRED)
+target_include_directories(garglk-common PUBLIC cheapglk PRIVATE ${FREETYPE_INCLUDE_DIRS})
+target_link_libraries(garglk-common PRIVATE ${FREETYPE_LIBRARIES})
+
+if(NOT WITH_BUNDLED_FMT)
+    find_package(fmt CONFIG)
+endif()
+
+function(add_fmt target)
+    if(TARGET fmt::fmt)
+        target_link_libraries(${target} PRIVATE fmt::fmt)
+    else()
+        target_compile_definitions(${target} PRIVATE GARGLK_CONFIG_BUNDLED_FMT)
+    endif()
+endfunction()
+
+add_fmt(garglk-common)
+
+find_library(MATH_LIBRARY m)
+if(MATH_LIBRARY)
+    target_link_libraries(garglk-common PRIVATE ${MATH_LIBRARY})
+endif()
+
+add_library(garglkmain STATIC main.c)
+c_standard(garglkmain 11)
+warnings(garglkmain)
+target_include_directories(garglkmain PRIVATE cheapglk)
+
+# If garglk is built with PIC, do the same for garglkmain.
+get_property(GARGLK_PIC TARGET garglk-common PROPERTY POSITION_INDEPENDENT_CODE)
+set_target_properties(garglkmain PROPERTIES POSITION_INDEPENDENT_CODE "${GARGLK_PIC}")
+
+if(WITH_LAUNCHER)
+    add_executable(gargoyle WIN32 launcher.cpp)
+    target_include_directories(gargoyle PRIVATE cheapglk)
+    target_link_libraries(gargoyle PRIVATE garglk)
+    add_fmt(gargoyle)
+    cxx_standard(gargoyle 17)
+    warnings(gargoyle)
+
+    target_compile_definitions(gargoyle PRIVATE "GARGLKINI=\"${GARGLKINI}\"" "GARGLKPRE=\"${GARGLKPRE}\"")
+    if(WITH_FRANKENDRIFT)
+        target_compile_definitions(gargoyle PRIVATE WITH_FRANKENDRIFT=1)
+    endif()
+    if(WITH_SCARE)
+        target_compile_definitions(gargoyle PRIVATE WITH_SCARE=1)
+    endif()
+    if(${INTERFACE} STREQUAL "COCOA")
+        target_sources(gargoyle PRIVATE launchmac.mm)
+        target_compile_options(gargoyle PRIVATE "-Wno-deprecated-declarations")
+    elseif(${INTERFACE} STREQUAL "KINDLE")
+        target_sources(gargoyle PRIVATE kindle/launchkindle.cpp)
+    else()
+        target_sources(gargoyle PRIVATE launchqt.cpp)
+
+        # For AppImage, interpreters are installed in the same directory as the
+        # launcher, so don't provide GARGLK_CONFIG_INTERPRETER_DIR: in its
+        # absence, the directory of the "gargoyle" binary is searched.
+        #
+        # For Apple, when doing a dist install, the same holds: it expects to
+        # find interpreters in the same directory as the gargoyle binary.
+        if(UNIX AND NOT APPIMAGE AND NOT DIST_INSTALL)
+            target_compile_definitions(gargoyle PRIVATE "GARGLK_CONFIG_INTERPRETER_DIR=\"${INTERPRETER_INSTALL_DIR}\"")
+        endif()
+    endif()
+endif()
+
+if(${INTERFACE} STREQUAL "COCOA")
+    find_library(COCOA_LIBRARY Cocoa REQUIRED)
+    find_package(OpenGL REQUIRED)
+    target_link_libraries(garglk-common PUBLIC ${COCOA_LIBRARY} ${OPENGL_LIBRARIES})
+elseif(${INTERFACE} STREQUAL "KINDLE")
+    find_package(PkgConfig REQUIRED)
+    # Not an imported target: kindle-sdk lists include directories it does
+    # not ship, which imported targets reject.
+    pkg_check_modules(KINDLE REQUIRED gtk+-2.0 lipc)
+    target_link_libraries(garglk-common PUBLIC ${KINDLE_LDFLAGS})
+    target_include_directories(garglk-common PUBLIC kindle ${KINDLE_INCLUDE_DIRS})
+
+    file(GLOB KINDLE_CATALOGS "kindle/l10n/*.po")
+    if(DIST_INSTALL)
+        install(FILES ${KINDLE_CATALOGS} DESTINATION "${PROJECT_SOURCE_DIR}/build/dist/l10n")
+    elseif(UNIX)
+        install(FILES ${KINDLE_CATALOGS} DESTINATION "${INTERPRETER_INSTALL_DIR}/l10n")
+    endif()
+else()
+    set(QT_VERSION "6" CACHE STRING "Specify which major Qt version to use (5 or 6)")
+    option(WITH_KDE "Use KDE Frameworks (improves discovery of a text editor for config file editing)" OFF)
+
+    find_package(Qt${QT_VERSION} COMPONENTS Widgets REQUIRED CONFIG)
+    target_link_libraries(garglk-common PRIVATE Qt${QT_VERSION}::Widgets)
+
+    # QDBus exists on Windows, but almost nobody will be running DBus
+    # there, so using QDBus would effectively just require shipping the
+    # QDBus DLL for no gain.
+    if(UNIX)
+        find_package(Qt${QT_VERSION} COMPONENTS DBus CONFIG)
+        if(Qt${QT_VERSION}DBus_FOUND)
+            target_compile_definitions(garglk-common PRIVATE GARGLK_CONFIG_HAS_QDBUS)
+            target_link_libraries(garglk-common PRIVATE Qt${QT_VERSION}::DBus)
+        endif()
+    endif()
+
+    if(WITH_KDE)
+        find_package(ECM 1.0.0 REQUIRED NO_MODULE)
+        set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH} ${ECM_KDE_MODULE_DIR})
+
+        # This may trigger a warning about setting a more recent required CMake
+        # version. Such a warning can be safely ignored. The newest KF versions
+        # require a more recent version of CMake than Gargoyle does, but older
+        # versions do not. If Gargoyle were to require the CMake version that
+        # corresponds to the most recent KF version, systems with older
+        # combinations of CMake and KF would be excluded, even though they work
+        # just fine.
+        find_package(KF${QT_VERSION} REQUIRED COMPONENTS KIO Service)
+        target_link_libraries(garglk-common PRIVATE KF${QT_VERSION}::KIOWidgets KF${QT_VERSION}::Service)
+        set_property(SOURCE sysqt.cpp APPEND PROPERTY COMPILE_DEFINITIONS GARGLK_CONFIG_KDE)
+    endif()
+
+    if(WITH_LAUNCHER)
+        target_link_libraries(gargoyle PRIVATE Qt${QT_VERSION}::Widgets)
+    endif()
+
+    target_compile_definitions(garglk-common PRIVATE GARGLK_CONFIG_TICK)
+    set(GARGLK_NEEDS_TICK TRUE CACHE INTERNAL "")
+endif()
+
+function(garglk_add_snddecode)
+    if(MSVC AND CMAKE_HOST_WIN32)  # native MSVC build on Windows: pkg-config is unreliable, fall back to find_library/find_path
+        find_library(SNDFILE sndfile REQUIRED)
+        find_library(MPG123 NAMES mpg123 libmpg123 REQUIRED)
+        find_library(OPENMPT NAMES openmpt libopenmpt REQUIRED)
+        find_path(SNDFILE_INCLUDE_DIR sndfile.hh REQUIRED)
+        find_path(MPG123_INCLUDE_DIR mpg123.h REQUIRED)
+        find_path(OPENMPT_INCLUDE_DIR libopenmpt/libopenmpt.hpp REQUIRED)
+        target_include_directories(garglk-common PRIVATE
+            ${SNDFILE_INCLUDE_DIR} ${MPG123_INCLUDE_DIR} ${OPENMPT_INCLUDE_DIR})
+        target_link_libraries(garglk-common PRIVATE ${SNDFILE} ${MPG123} ${OPENMPT})
+
+        find_library(FLUIDSYNTH NAMES fluidsynth libfluidsynth)
+        if(FLUIDSYNTH)
+            find_path(FLUIDSYNTH_INCLUDE_DIR fluidsynth.h REQUIRED)
+            target_compile_definitions(garglk-common PRIVATE GARGLK_HAS_FLUIDSYNTH)
+            target_include_directories(garglk-common PRIVATE ${FLUIDSYNTH_INCLUDE_DIR})
+            target_link_libraries(garglk-common PRIVATE ${FLUIDSYNTH})
+        endif()
+    else()  # Linux/Mac native, or Linux/Mac cross-compiling to MSVC: use pkg-config
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(SOUND REQUIRED IMPORTED_TARGET sndfile libmpg123 libopenmpt)
+
+        if(SOUND_libopenmpt_VERSION VERSION_LESS "0.6.0")
+            target_compile_definitions(garglk-common PRIVATE GARGLK_CONFIG_OLD_LIBOPENMPT)
+        endif()
+
+        target_link_libraries(garglk-common PRIVATE PkgConfig::SOUND)
+
+        pkg_check_modules(FLUIDSYNTH IMPORTED_TARGET fluidsynth)
+        if(TARGET PkgConfig::FLUIDSYNTH)
+            target_compile_definitions(garglk-common PRIVATE GARGLK_HAS_FLUIDSYNTH)
+            target_link_libraries(garglk-common PRIVATE PkgConfig::FLUIDSYNTH)
+        endif()
+    endif()
+
+    target_sources(garglk-common PRIVATE snddecode.cpp)
+endfunction()
+
+if("${SOUND}" STREQUAL "QT")
+    find_package(Qt${QT_VERSION} COMPONENTS Multimedia REQUIRED CONFIG)
+    target_link_libraries(garglk-common PRIVATE Qt${QT_VERSION}::Multimedia)
+    garglk_add_snddecode()
+    target_sources(garglk-common PRIVATE sndqt.cpp)
+elseif("${SOUND}" STREQUAL "SDL2")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2 SDL2_mixer)
+    target_link_libraries(garglk-common PRIVATE PkgConfig::SDL2)
+    target_sources(garglk-common PRIVATE sndsdl2.cpp sndsdl-common.cpp)
+    target_compile_definitions(garglk-common PRIVATE GARGLK_CONFIG_SDL)
+elseif("${SOUND}" STREQUAL "SDL3")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
+    target_link_libraries(garglk-common PRIVATE PkgConfig::SDL3)
+    garglk_add_snddecode()
+    target_sources(garglk-common PRIVATE sndsdl3.cpp sndsdl-common.cpp)
+    target_compile_definitions(garglk-common PRIVATE GARGLK_CONFIG_SDL GARGLK_CONFIG_SDL3)
+elseif("${SOUND}" STREQUAL "NONE")
+    target_sources(garglk-common PRIVATE sndnull.cpp)
+    target_compile_definitions(garglk-common PRIVATE GARGLK_CONFIG_NO_SOUND)
+else()
+    message(FATAL_ERROR "Unknown SOUND backend \"${SOUND}\"; valid values are SDL2, SDL3, QT, or NONE (\"SDL\" is accepted as an alias for SDL2).")
+endif()
+
+if(IMAGES STREQUAL "SYSTEM")
+    find_package(PNG 1.6 REQUIRED)
+    target_include_directories(garglk-common PRIVATE ${PNG_INCLUDE_DIRS})
+    target_link_libraries(garglk-common PRIVATE ${PNG_LIBRARIES})
+
+    if(NOT JPEGLIB STREQUAL "AUTO")
+        set(JPEG_REQUIRED "REQUIRED")
+    endif()
+
+    if(JPEGLIB STREQUAL "AUTO" OR JPEGLIB STREQUAL "TURBO")
+        find_package(PkgConfig ${JPEG_REQUIRED})
+        if(PkgConfig_FOUND)
+            pkg_check_modules(TURBO ${JPEG_REQUIRED} IMPORTED_TARGET libturbojpeg>=2.0)
+            if(TARGET PkgConfig::TURBO)
+                target_include_directories(garglk-common PRIVATE PkgConfig::TURBO)
+                target_link_libraries(garglk-common PRIVATE PkgConfig::TURBO)
+                target_compile_definitions(garglk-common PRIVATE GARGLK_CONFIG_JPEG_TURBO)
+                set(GARGLK_FOUND_JPEG TRUE)
+            endif()
+        else()  # e.g. Windows-on-ARM cross-compilation
+            find_library(TURBO NAMES turbojpeg libturbojpeg)
+            if(NOT "${TURBO}" STREQUAL "TURBO-NOTFOUND")
+                target_link_libraries(garglk-common PRIVATE ${TURBO})
+                target_compile_definitions(garglk-common PRIVATE GARGLK_CONFIG_JPEG_TURBO)
+                set(GARGLK_FOUND_JPEG TRUE)
+            endif()
+        endif()
+    endif()
+
+    if(NOT GARGLK_FOUND_JPEG AND (JPEGLIB STREQUAL "AUTO" OR JPEGLIB STREQUAL "IJG"))
+        find_package(JPEG 80 ${JPEG_REQUIRED})
+        if(JPEG_FOUND)
+            target_include_directories(garglk-common PRIVATE "${JPEG_INCLUDE_DIRS}")
+            target_link_libraries(garglk-common PRIVATE "${JPEG_LIBRARIES}")
+            set(GARGLK_FOUND_JPEG TRUE)
+        endif()
+    endif()
+
+    if(NOT GARGLK_FOUND_JPEG)
+        message(FATAL_ERROR "Unable to find a usable JPEG library")
+    endif()
+endif()
+
+target_compile_definitions(garglk-common PRIVATE GARGLK_CONFIG_SCALERS)
+target_link_libraries(garglk-common PRIVATE hqx)
 
 if(WITH_BABEL)
-  list(APPEND GARGLK_LIBS babel)
-  list(APPEND GARGLK_INCLUDES PRIVATE ../support/babel)
-  list(APPEND GARGLK_DEFINITIONS PRIVATE BABEL_HANDLER)
+    target_link_libraries(garglk-common PRIVATE babel)
+    target_compile_definitions(garglk-common PRIVATE BABEL_HANDLER)
 endif()
 
 if(WITH_TTS)
-  if(UNIX)
-    pkg_check_modules(SPEECH_DISPATCHER REQUIRED speech-dispatcher)
-    list(APPEND GARGLK_INCLUDES ${SPEECH_DISPATCHER_INCLUDE_DIRS})
-    list(APPEND GARGLK_LIBS ${SPEECH_DISPATCHER_LIBRARIES})
-    list(APPEND SRCS ttsspeechd.c)
-  elseif(MINGW)
-    list(APPEND SRCS ttswin.c)
-  else()
-    message(FATAL_ERROR "TTS requested but no implementation is available on this platform (${CMAKE_SYSTEM_NAME}).")
-  endif()
+    if(APPLE)
+        target_sources(garglk-common PRIVATE ttsmac.mm)
+    elseif(UNIX)
+        find_package(PkgConfig REQUIRED)
+
+        if(NOT WITH_TTS STREQUAL "AUTO")
+            set(TTS_REQUIRED "REQUIRED")
+        endif()
+
+        if(NOT WITH_TTS STREQUAL "DYNAMIC")
+            pkg_check_modules(SPEECH_DISPATCHER ${TTS_REQUIRED} IMPORTED_TARGET speech-dispatcher)
+        endif()
+
+        if(WITH_TTS STREQUAL "DYNAMIC")
+            target_sources(garglk-common PRIVATE ttsspeechd.cpp)
+            target_link_libraries(garglk-common PRIVATE ${CMAKE_DL_LIBS})
+            target_compile_definitions(garglk-common PRIVATE "GARGLK_CONFIG_DLOPEN_LIBSPEECHD")
+        elseif(SPEECH_DISPATCHER_FOUND)
+            target_sources(garglk-common PRIVATE ttsspeechd.cpp)
+            target_link_libraries(garglk-common PRIVATE PkgConfig::SPEECH_DISPATCHER)
+        else()
+            target_sources(garglk-common PRIVATE ttsnull.cpp)
+        endif()
+    elseif(WIN32)
+        target_sources(garglk-common PRIVATE ttswin.cpp)
+        target_link_libraries(garglk-common PRIVATE sapi ole32)
+    else()
+        message(FATAL_ERROR "TTS requested but no implementation is available on this platform (${CMAKE_SYSTEM_NAME}).")
+    endif()
 else()
-  list(APPEND SRCS ttsnull.c)
+    target_sources(garglk-common PRIVATE ttsnull.cpp)
 endif()
 
-if("${GUILIB}" STREQUAL "GTK")
-  find_package(GTK2 REQUIRED)
-  list(APPEND GARGLK_INCLUDES ${GTK2_INCLUDE_DIRS})
-  list(APPEND GARGLK_LIBS ${GTK2_LIBRARIES})
-  list(APPEND SRCS sysgtk.c fontfc.c gtk_utils.c)
+if(APPLE)
+    target_sources(garglk-common PRIVATE fontmac.mm)
+elseif(UNIX)
+    # Fontconfig support isn't included with CMake till 3.14, so use pkg-config.
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(FONTCONFIG REQUIRED IMPORTED_TARGET fontconfig)
+    target_sources(garglk-common PRIVATE fontfc.cpp)
+    target_link_libraries(garglk-common PRIVATE PkgConfig::FONTCONFIG)
 
-  set(GARGOYLE_SOURCES launchgtk.c)
-  set(GARGOYLE_INCLUDES ${GTK2_INCLUDE_DIRS})
-elseif("${GUILIB}" STREQUAL "EFL")
-  find_package(Elementary REQUIRED)
-  find_package(Evas REQUIRED)
-  find_package(Ecore REQUIRED)
-
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(ECORE_EXTRAS REQUIRED ecore-x ecore-evas)
-
-  list(APPEND GARGLK_INCLUDES ${ELEMENTARY_INCLUDE_DIRS} ${EVAS_INCLUDE_DIRS} ${ECORE_INCLUDE_DIRS} ${ECORE_EXTRAS_INCLUDE_DIRS})
-  list(APPEND GARGLK_LIBS ${ELEMENTARY_LIBRARIES} ${EVAS_LIBRARIES} ${ECORE_LIBRARIES} ${ECORE_EXTRAS_LIBRARIES})
-  list(APPEND GARGLK_DEFINITIONS PRIVATE EFL_4BPP)
-  list(APPEND SRCS sysefl.c fontfc.c)
-
-  set(GARGOYLE_SOURCES launchefl.c)
-  set(GARGOYLE_INCLUDES ${ELEMENTARY_INCLUDE_DIRS} ${EVAS_INCLUDE_DIRS} ${ECORE_INCLUDE_DIRS} ${ECORE_EXTRAS_DIRS})
-elseif("${GUILIB}" STREQUAL "MINGW32")
-  list(APPEND GARGLK_INCLUDES ../support/freetype ../support/libpng ../support/zlib ../support/libjpeg)
-  list(APPEND GARGLK_LIBS winmm)
-
-  # These libraries can be found with a combination of
-  # include_directories and adding "png14-14", etc. to ${GARGLK_LIBS};
-  # however, once winmm is also added, these can no longer be found, as
-  # link_directories seems to be ignored. Linking the DLLs in directly
-  # is a workaround.
-  #link_directories(../support/libpng ../support/freetype ../support/libjpeg)
-  list(APPEND GARGLK_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../support/freetype/freetype6.dll)
-  list(APPEND GARGLK_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../support/libpng/libpng14-14.dll)
-  list(APPEND GARGLK_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../support/libjpeg/libjpeg-8.dll)
-  list(APPEND SRCS syswin.c fontwin.c icons.rc)
-
-  set(GARGOYLE_SOURCES launchwin.c)
+    if(WITH_X11_FONTS)
+        set(X11_FONT_DIR "/usr/share/fonts" CACHE STRING "Directory tree to scan for X11 fonts (fonts.dir)")
+        set(X11_FS_CONFIG "/etc/X11/fs/config" CACHE STRING "X font server config to read a font catalogue from")
+        target_sources(garglk-common PRIVATE fontx11.cpp)
+        target_compile_definitions(garglk-common PRIVATE
+            GARGLK_CONFIG_X11FONTS
+            X11_FONT_DIR="${X11_FONT_DIR}"
+            X11_FS_CONFIG="${X11_FS_CONFIG}")
+    endif()
+elseif(WIN32)
+    target_sources(garglk-common PRIVATE fontwin.cpp)
+    target_link_libraries(garglk-common PRIVATE winmm shlwapi)
+    target_sources(gargoyle PRIVATE icons.rc)
 else()
-  message(FATAL_ERROR "Invalid GUILIB: ${GUILIB}.")
+    message(FATAL_ERROR "Unsupported platform")
 endif()
 
-# Shared fails on MinGW, and since the DLL isn't really useful installed
-# the way it is on Unix, don't worry about it.
-if(UNIX)
-  add_library(garglk SHARED ${SRCS})
-else()
-  add_library(garglk STATIC ${SRCS})
+# Due to incompatibilties in GPLv2 vs GPLv3, two garglk libraries are
+# created: one that contains GPLv3 code (and is thus under the GPLv3
+# itself), and one that does not (so is GPLv2). Interpreters which are
+# GPLv2 can link against the GPLv2 version, whereas the rest can link
+# against the GPLv3 version.
+add_library(garglk)
+target_link_libraries(garglk PUBLIC garglk-common)
+
+add_library(garglk-gpl2)
+target_link_libraries(garglk-gpl2 PUBLIC garglk-common)
+
+# Running out of the build directory on Windows also needs the Qt DLLs
+# there. windeployqt copies them in, but only needs to be run once per
+# build directory, so provide it as a target to invoke by hand ("ninja
+# deployqt") instead of paying for it on every relink. Cross-compiled
+# builds don't get this: windeployqt is a Windows program, and the
+# cross-compiling scripts deploy Qt themselves.
+if(WIN32 AND CMAKE_HOST_WIN32 AND INTERFACE STREQUAL "QT")
+    if(TARGET Qt${QT_VERSION}::windeployqt)
+        set(GARGLK_WINDEPLOYQT "Qt${QT_VERSION}::windeployqt")
+    else()
+        find_program(GARGLK_WINDEPLOYQT windeployqt
+            HINTS "${QT${QT_VERSION}_INSTALL_PREFIX}/${QT${QT_VERSION}_INSTALL_BINS}")
+    endif()
+
+    if(GARGLK_WINDEPLOYQT)
+        add_custom_target(deployqt
+            COMMAND "${GARGLK_WINDEPLOYQT}" --no-compiler-runtime "$<TARGET_FILE:garglk>"
+            COMMENT "Deploying the Qt runtime next to garglk.dll"
+            VERBATIM
+        )
+        add_dependencies(deployqt garglk)
+    else()
+        message(STATUS "windeployqt not found; the \"deployqt\" target is unavailable")
+    endif()
 endif()
-set_property(TARGET garglk PROPERTY SOVERSION 1)
-set_property(TARGET garglk PROPERTY C_STANDARD 99)
-target_link_libraries(garglk ${GARGLK_LIBS} m)
-target_include_directories(garglk PRIVATE ${GARGLK_INCLUDES})
-target_compile_definitions(garglk ${GARGLK_DEFINITIONS})
-target_compile_definitions(garglk PRIVATE "GARGLKINI=\"${GARGLKINI}\"")
 
-add_executable(gargoyle launcher.c ${GARGOYLE_SOURCES})
-set_property(TARGET gargoyle PROPERTY C_STANDARD 99)
-target_include_directories(gargoyle PRIVATE ${GARGOYLE_INCLUDES})
-target_link_libraries(gargoyle garglk)
-target_compile_definitions(gargoyle PRIVATE "GARGLKINI=\"${GARGLKINI}\"" "GARGLKPRE=\"${GARGLKPRE}\"")
+target_include_directories(garglk-common PRIVATE ../support/xbrz)
+target_link_libraries(garglk PRIVATE xbrz)
+target_link_libraries(garglk-gpl2 PRIVATE xbrz-null)
 
-add_library(garglkmain STATIC main.c)
+if(DIST_INSTALL)
+    if(WITH_LAUNCHER)
+        install(TARGETS gargoyle DESTINATION "${PROJECT_SOURCE_DIR}/build/dist")
+    endif()
 
-install(TARGETS gargoyle DESTINATION "${CMAKE_INSTALL_BINDIR}")
-install(TARGETS garglk garglkmain DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-install(FILES gi_blorb.h glk.h glkstart.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/garglk")
-configure_file("garglk.pc.in" "${CMAKE_CURRENT_BINARY_DIR}/garglk.pc" @ONLY)
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/garglk.pc" DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+    if(BUILD_SHARED_LIBS)
+        install(TARGETS garglk DESTINATION "${PROJECT_SOURCE_DIR}/build/dist")
+        install(TARGETS garglk-gpl2 DESTINATION "${PROJECT_SOURCE_DIR}/build/dist")
+    endif()
+
+    if(NOT APPLE)
+        install(FILES
+            "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Mono-Bold-Italic.ttf"
+            "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Mono-Bold.ttf"
+            "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Mono-Italic.ttf"
+            "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Mono.ttf"
+            "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Serif-Bold-Italic.ttf"
+            "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Serif-Bold.ttf"
+            "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Serif-Italic.ttf"
+            "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Serif.ttf"
+            "${PROJECT_SOURCE_DIR}/fonts/unifont.otf"
+            "${PROJECT_SOURCE_DIR}/fonts/unifont_upper.otf"
+            DESTINATION "${PROJECT_SOURCE_DIR}/build/dist")
+
+        install(FILES
+            "${PROJECT_SOURCE_DIR}/themes/Blue.json"
+            "${PROJECT_SOURCE_DIR}/themes/Breeze Darker.json"
+            "${PROJECT_SOURCE_DIR}/themes/Lectrote Dark.json"
+            "${PROJECT_SOURCE_DIR}/themes/Lectrote Sepia.json"
+            "${PROJECT_SOURCE_DIR}/themes/Lectrote Slate.json"
+            "${PROJECT_SOURCE_DIR}/themes/Pencil.json"
+            "${PROJECT_SOURCE_DIR}/themes/Zoom.json"
+            "${PROJECT_SOURCE_DIR}/themes/dark.json"
+            "${PROJECT_SOURCE_DIR}/themes/light.json"
+            DESTINATION "${PROJECT_SOURCE_DIR}/build/dist/themes")
+    endif()
+elseif(UNIX)
+    if(WITH_LAUNCHER)
+        install(TARGETS gargoyle DESTINATION "${CMAKE_INSTALL_BINDIR}")
+        install(FILES ../gargoyle.6 DESTINATION "${CMAKE_INSTALL_MANDIR}/man6")
+    endif()
+
+    if(INSTALL_DEV)
+        install(TARGETS garglk garglk-gpl2 garglkmain DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+        install(FILES cheapglk/gi_blorb.h cheapglk/glk.h cheapglk/glkstart.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/garglk")
+        configure_file("garglk.pc.in" "${CMAKE_CURRENT_BINARY_DIR}/garglk.pc" @ONLY)
+        install(FILES "${CMAKE_CURRENT_BINARY_DIR}/garglk.pc" DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+    elseif(BUILD_SHARED_LIBS)
+        install(TARGETS garglk garglk-gpl2 DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    endif()
+
+    if(INSTALL_GARGLKINI)
+        install(FILES "garglk.ini" DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}")
+    endif()
+
+    if(WITH_FREEDESKTOP)
+        install(FILES "gargoyle.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications" RENAME "io.github.garglk.Gargoyle.desktop")
+        install(FILES "io.github.garglk.GargoyleEditConfig.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+        install(FILES "gargoyle-house.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons" RENAME "io.github.garglk.Gargoyle.png")
+        install(FILES "shared-mime-info.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/mime/packages" RENAME "gargoyle.xml")
+        install(FILES "io.github.garglk.Gargoyle.appdata.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/metainfo")
+
+        foreach(terp adrift advsys agt alan-adventure-game alan3-adventure-game blorb glulx hugo-image level9 magscroll tads t3vm-image zmachine)
+            install(FILES "gargoyle-docu2.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/mimetypes" RENAME "application-x-${terp}.png")
+        endforeach()
+    endif()
+
+    install(FILES
+        "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Mono-Bold-Italic.ttf"
+        "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Mono-Bold.ttf"
+        "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Mono-Italic.ttf"
+        "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Mono.ttf"
+        "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Serif-Bold-Italic.ttf"
+        "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Serif-Bold.ttf"
+        "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Serif-Italic.ttf"
+        "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Serif.ttf"
+        "${PROJECT_SOURCE_DIR}/fonts/unifont.otf"
+        "${PROJECT_SOURCE_DIR}/fonts/unifont_upper.otf"
+        DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/gargoyle")
+
+    install(FILES
+        "${PROJECT_SOURCE_DIR}/themes/Blue.json"
+        "${PROJECT_SOURCE_DIR}/themes/Breeze Darker.json"
+        "${PROJECT_SOURCE_DIR}/themes/Lectrote Dark.json"
+        "${PROJECT_SOURCE_DIR}/themes/Lectrote Sepia.json"
+        "${PROJECT_SOURCE_DIR}/themes/Lectrote Slate.json"
+        "${PROJECT_SOURCE_DIR}/themes/Pencil.json"
+        "${PROJECT_SOURCE_DIR}/themes/Zoom.json"
+        "${PROJECT_SOURCE_DIR}/themes/dark.json"
+        "${PROJECT_SOURCE_DIR}/themes/light.json"
+        DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/gargoyle/themes")
+
+endif()
+
+# For users who want to test Gargoyle by running it out of the CMake build
+# directory, ensure fonts exist here. By default Gargoyle will look for the
+# fonts "Gargoyle Serif" and "Gargoyle Mono", falling back to the TTF files if
+# no such fonts are on the system. If Gargoyle is not installed system-wide,
+# then the TTF files won't be available either. It will, as a last-ditch effort,
+# look in the current directory for the fonts, so copying them here ought to
+# allow Gargoyle to find them.
+file(COPY
+    "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Mono-Bold-Italic.ttf"
+    "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Mono-Bold.ttf"
+    "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Mono-Italic.ttf"
+    "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Mono.ttf"
+    "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Serif-Bold-Italic.ttf"
+    "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Serif-Bold.ttf"
+    "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Serif-Italic.ttf"
+    "${PROJECT_SOURCE_DIR}/fonts/Gargoyle-Serif.ttf"
+    "${PROJECT_SOURCE_DIR}/fonts/unifont.otf"
+    "${PROJECT_SOURCE_DIR}/fonts/unifont_upper.otf"
+    DESTINATION "${CMAKE_BINARY_DIR}")

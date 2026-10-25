@@ -1,0 +1,198 @@
+// Copyright 2010-2025 Chris Spiegel.
+//
+// SPDX-License-Identifier: MIT
+
+#include <cerrno>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <functional>
+#include <iostream>
+#include <optional>
+#include <string>
+
+#include "util.h"
+#include "process.h"
+#include "screen.h"
+#include "types.h"
+#include "zterp.h"
+
+#ifdef ZTERP_GLK
+#include <glk.h>
+#endif
+
+// Values are usually stored in a uint16_t because most parts of the
+// Z-machine make use of 16-bit unsigned integers. However, in a few
+// places the unsigned value must be treated as signed. The “obvious”
+// solution is to simply convert to an int16_t, but this is technically
+// implementation-defined behavior in C++ and not guaranteed to provide
+// the expected result. In order to be maximally portable, this
+// function converts a uint16_t to its int16_t counterpart manually.
+// Although it ought to be slower, both Gcc and Clang recognize this
+// construct and generate the same code as a direct conversion. An
+// alternative direct conversion method is included here for reference.
+#if 1
+int16_t as_signed(uint16_t n)
+{
+    return ((n & 0x8000) == 0x8000) ? static_cast<long>(n) - 0x10000L : n;
+}
+#else
+int16_t as_signed(uint16_t n)
+{
+    return n;
+}
+#endif
+
+#ifndef ZTERP_NO_SAFETY_CHECKS
+void assert_fail(const char *fmt, ...)
+{
+    va_list ap;
+    std::string str;
+
+    va_start(ap, fmt);
+    str = vstring(fmt, ap);
+    va_end(ap);
+
+    str += fstring(" (pc = 0x%lx)", current_instruction);
+
+    die("%s", str.c_str());
+}
+#endif
+
+void warning(const char *fmt, ...)
+{
+    va_list ap;
+    std::string str;
+
+    va_start(ap, fmt);
+    str = vstring(fmt, ap);
+    va_end(ap);
+
+    show_message("Warning: %s", str.c_str());
+}
+
+void die(const char *fmt, ...)
+{
+    va_list ap;
+    std::string str;
+
+    va_start(ap, fmt);
+    str = vstring(fmt, ap);
+    va_end(ap);
+
+    show_message("Fatal error: %s", str.c_str());
+
+#ifdef GARGLK
+    std::cerr << "Fatal error: " << str << std::endl;
+#endif
+
+    throw Exit(EXIT_FAILURE);
+}
+
+std::optional<long> parseint(const std::string &s, int base)
+{
+    char *endptr;
+    const char *cstr = s.c_str();
+
+    errno = 0;
+    long ret = std::strtol(cstr, &endptr, base);
+
+    if (endptr != cstr && *endptr == 0 && errno != ERANGE) {
+        return ret;
+    } else {
+        return std::nullopt;
+    }
+}
+
+std::string vstring(const char *fmt, std::va_list ap)
+{
+    std::va_list ap_copy;
+    std::string s;
+
+    va_copy(ap_copy, ap);
+
+    int n = std::vsnprintf(nullptr, 0, fmt, ap);
+    if (n < 0) {
+        die("error processing format string");
+    }
+
+    s.resize(n);
+    std::vsnprintf(s.data(), n + 1, fmt, ap_copy);
+
+    va_end(ap_copy);
+
+    return s;
+}
+
+std::string fstring(const char *fmt, ...)
+{
+    std::va_list ap;
+    std::string s;
+
+    va_start(ap, fmt);
+    s = vstring(fmt, ap);
+    va_end(ap);
+
+    return s;
+}
+
+std::string ltrim(const std::string &s)
+{
+    if (auto pos = s.find_first_not_of(" \t\r"); pos != std::string::npos) {
+        return s.substr(pos);
+    } else {
+        return "";
+    }
+}
+
+std::string rtrim(const std::string &s)
+{
+    if (auto pos = s.find_last_not_of(" \t\r"); pos != std::string::npos) {
+        return s.substr(0, pos + 1);
+    } else {
+        return "";
+    }
+}
+
+void parse_grouped_file(std::istream &f, const std::function<void(const std::string &line, int lineno)> &callback)
+{
+    std::string line;
+    bool story_matches = true;
+
+    for (int lineno = 1; std::getline(f, line); lineno++) {
+        line = ltrim(line);
+
+        if (auto comment = line.find('#'); comment != std::string::npos) {
+            line.erase(comment);
+        }
+        line = rtrim(line);
+
+        if (line.empty()) {
+            continue;
+        }
+
+        if (line[0] == '[' && line.back() == ']') {
+            std::string id = line.substr(1, line.size() - 2);
+            story_matches = id == get_story_id();
+
+            continue;
+        }
+
+        if (!story_matches) {
+            continue;
+        }
+
+        callback(line, lineno);
+    }
+}
+
+std::optional<std::string> zterp_getenv(const std::string &name)
+{
+    const char *val = std::getenv(name.c_str());
+    if (val == nullptr) {
+        return std::nullopt;
+    }
+
+    return val;
+}

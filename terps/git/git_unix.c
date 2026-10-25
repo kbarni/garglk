@@ -102,9 +102,9 @@ int glkunix_startup_code(glkunix_startup_t *data)
 
 void glk_main ()
 {
-    int          file;
-    struct stat  info;
-    const char * ptr;
+    int         file;
+    struct stat info;
+    git_uint8 * ptr;
     
 #ifdef GARGLK
 	if (gStartupError)
@@ -211,3 +211,12 @@ void glk_main ()
 }
 
 #endif // USE_MMAP
+
+#ifdef USE_NATIVE_RANDOM
+
+glui32 native_random()
+{
+    return arc4random();
+}
+
+#endif // USE_NATIVE_RANDOM

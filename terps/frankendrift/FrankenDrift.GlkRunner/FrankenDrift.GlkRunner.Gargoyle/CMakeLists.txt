@@ -1,0 +1,114 @@
+find_program(DOTNET dotnet)
+if(NOT DOTNET)
+    message(FATAL_ERROR "FrankenDrift requires the .NET SDK (missing \"dotnet\")")
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(GARGLK_DOTNET_RID "linux")
+elseif(WIN32)
+    set(GARGLK_DOTNET_RID "win")
+    set(GARGLK_FRANKEN_EXT ".exe")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(GARGLK_DOTNET_RID "osx")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    set(GARGLK_DOTNET_RID "freebsd")
+else()
+    message(FATAL_ERROR "FrankenDrift is currently not supported on this platform")
+endif()
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(X86_64|x86_64|AMD64|x64|amd64)$")
+    set(GARGLK_DOTNET_RID "${GARGLK_DOTNET_RID}-x64")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|arm64|aarch64|armv8l)$")
+    set(GARGLK_DOTNET_RID "${GARGLK_DOTNET_RID}-arm64")
+else()
+    message(FATAL_ERROR "Unsupported CPU architecture for FrankenDrift: ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
+if(APPLE)
+    set(GARGLK_FRANKEN_DYLIB "${CMAKE_BINARY_DIR}/garglk/libgarglk.dylib")
+elseif(WIN32)
+    set(GARGLK_FRANKEN_DYLIB "${CMAKE_BINARY_DIR}/garglk/garglk.lib")
+else()
+    set(GARGLK_FRANKEN_DYLIB "${CMAKE_BINARY_DIR}/garglk/libgarglk.so")
+endif()
+
+if(WIN32 AND CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+    # Cross-compiling for Windows from Linux: use the native lld-link and
+    # Windows SDK library paths so NativeAOT can link without Visual Studio.
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|arm64|aarch64|armv8l)$")
+        set(GARGLK_WINSDK_LIBARCH "arm64")
+    else()
+        set(GARGLK_WINSDK_LIBARCH "x64")
+    endif()
+    set(GARGLK_DOTNET_AOT_FLAGS
+        -p:DisableUnsupportedError=true
+        -p:CppLinker=lld-link
+        -p:IlcUseEnvironmentalTools=true
+        "-p:GarglkSdkLibDir=${CMAKE_FIND_ROOT_PATH}/winsdk/sdk/lib/um/${GARGLK_WINSDK_LIBARCH}"
+        "-p:GarglkUcrtLibDir=${CMAKE_FIND_ROOT_PATH}/winsdk/sdk/lib/ucrt/${GARGLK_WINSDK_LIBARCH}"
+        "-p:GarglkCrtLibDir=${CMAKE_FIND_ROOT_PATH}/winsdk/crt/lib/${GARGLK_WINSDK_LIBARCH}"
+    )
+endif()
+
+# Keep dotnet from leaving daemons behind. They inherit make's file
+# descriptors, and Apple's patched GNU make hands its jobserver pipe
+# to every recipe child (not just submakes), so the daemons hold the
+# pipe open and "make -j" hangs at the end of the build until their
+# idle timeouts expire (~15 minutes). Hence, in the publish command:
+#
+# -nodeReuse:false: MSBuild normally keeps its worker node processes
+#   alive after the build to speed up future builds; this makes them
+#   exit when the build does.
+#
+# -p:UseSharedCompilation=false: the Roslyn compilers normally run in
+#   a long-lived VBCSCompiler server process; this compiles in-process
+#   instead.
+add_custom_target(frankendrift
+    ALL
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy "${GARGLK_FRANKEN_DYLIB}" "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMAND ${DOTNET} publish --self-contained -c Release -r "${GARGLK_DOTNET_RID}" -nodeReuse:false -p:UseSharedCompilation=false -p:GarglkMode=dynamic "-p:GarglkBuildDir=${CMAKE_CURRENT_BINARY_DIR}" "-p:BaseOutputPath=${CMAKE_CURRENT_BINARY_DIR}/bin/" "-p:GarglkLibDir=${CMAKE_BINARY_DIR}/garglk" ${GARGLK_DOTNET_AOT_FLAGS} -o "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMENT "Building FrankenDrift with ${DOTNET}"
+)
+
+get_filename_component(GARGLK_FRANKEN_DYLIB_NAME "${GARGLK_FRANKEN_DYLIB}" NAME)
+add_custom_command(TARGET frankendrift
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E rm "${CMAKE_CURRENT_SOURCE_DIR}/${GARGLK_FRANKEN_DYLIB_NAME}"
+)
+
+# dotnet publishes into this directory, not to a CMake target output
+# directory, so on Windows copy the result next to the rest of the
+# runtime output, where the launcher looks for interpreters.
+if(WIN32)
+    add_custom_command(TARGET frankendrift
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_BINARY_DIR}/FrankenDrift.GlkRunner.Gargoyle${GARGLK_FRANKEN_EXT}"
+            "$<TARGET_FILE_DIR:garglk>"
+    )
+endif()
+
+add_dependencies(frankendrift garglk)
+
+if(DIST_INSTALL)
+    install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/FrankenDrift.GlkRunner.Gargoyle${GARGLK_FRANKEN_EXT}" DESTINATION "${PROJECT_SOURCE_DIR}/build/dist")
+else()
+    install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/FrankenDrift.GlkRunner.Gargoyle${GARGLK_FRANKEN_EXT}" DESTINATION "${INTERPRETER_INSTALL_DIR}")
+    if(APPIMAGE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        # The .NET-published binary ships with rpath "$ORIGIN", but libgarglk.so
+        # is installed to ../lib. Retarget it so linuxdeploy can resolve the
+        # dependency inside the AppDir. file(RPATH_CHANGE) can't grow the rpath
+        # string in place, so use patchelf which rewrites the ELF.
+        find_program(PATCHELF patchelf REQUIRED)
+        install(CODE "
+            execute_process(
+                COMMAND \"${PATCHELF}\" --set-rpath \"\$ORIGIN/../lib\"
+                    \"\$ENV{DESTDIR}${INTERPRETER_INSTALL_DIR}/FrankenDrift.GlkRunner.Gargoyle\"
+                RESULT_VARIABLE _rc)
+            if(NOT _rc EQUAL 0)
+                message(FATAL_ERROR \"patchelf failed on FrankenDrift.GlkRunner.Gargoyle\")
+            endif()
+        ")
+    endif()
+endif()

@@ -1,0 +1,153 @@
+.Dd November 24, 2022
+.Dt GARGOYLE 6
+.Os
+.Sh NAME
+.Nm gargoyle
+.Nd interactive fiction player
+.Aq Lk https://github.com/garglk/garglk
+.Sh SYNOPSIS
+.Nm
+.Op Ar story
+.Nm
+.Fl d
+.Fl \-dump-config
+.Nm
+.Fl e
+.Fl \-edit-config
+.Nm
+.Fl m
+.Fl \-migrate-config
+.Nm
+.Fl p
+.Fl \-paths
+.Op Ar story
+.Nm
+.Fl t
+.Fl \-themes
+.Sh DESCRIPTION
+.Nm
+is an interactive fiction player that supports all the major interactive fiction
+formats, including:
+.Pp
+.Bl -bullet -offset indent -width 0 -compact
+.It
+AGT
+.It
+Adrift (excluding Adrift 5)
+.It
+AdvSys
+.It
+Alan 2 and 3
+.It
+Glulx
+.It
+Hugo
+.It
+JACL
+.It
+Level 9
+.It
+Magnetic Scrolls
+.It
+Scott Adams
+.It
+TADS 2 and 3
+.It
+Z\-machine
+.El
+.Pp
+If
+.Ar story
+is provided, it will be played.
+Otherwise, a file chooser will be displayed so a story can be selected.
+.Pp
+The following options are available:
+.Bl -tag -width flag
+.It Fl d , \-dump-config
+Dump the default config file to standard output.
+.It Fl e , \-edit-config
+Open Gargoyle's configuration file in a text editor, first creating it
+if necessary.
+.It Fl m , \-migrate-config
+Search for a move a legacy configuration file to the preferred location.
+In general, on Unix systems, this will mean renaming
+.Pa $HOME/.garglkrc
+to
+.Pa $HOME/.config/garglk.ini .
+.It Fl p , \-paths
+Display a list of configuration file paths as well as theme paths that
+will be used at runtime.
+If
+.Ar story
+is provided, game-specific configuration paths will be included.
+.It Fl t , \-themes
+Display a list of available color themes.
+.El
+.Sh CONFIGURATION
+.Nm
+is highly configurable, although all configuration is done through a text-based
+configuration file.
+To edit the configuration file, use
+.Aq control-comma
+while Gargoyle is running
+.Po Aq command-comma
+on Mac
+.Pc ,
+which will open the configuration file in a text editor.
+The configuration file can also be edited directly.
+The following locations are tried in order:
+.Pp
+.Bl -bullet -offset indent -width 0 -compact
+.It
+.Pa $XDG_CONFIG_HOME/garglk.ini
+or
+.Pa $HOME/.config/garglk.ini
+.It
+.Pa $HOME/.garglkrc
+.El
+.Pp
+In addition, game-specific and directory-specific overrides are available.
+For game-specific overrides, the game extension is removed and replaced with
+.Pa ini .
+For example,
+.Pa zork1.z3
+becomes
+.Pa zork1.ini .
+If this file exists, it will be treated as a configuration file.
+For directory-specific overrides, if the file
+.Pa garglk.ini
+exists in the same directory as the game, it will be treated as a configuration
+file.
+.Pp
+Finally, it is possible for a global configuration file to be installed.
+This is often the file
+.Pa /etc/garglk.ini ,
+but this is configurable at build time, and may also be disabled.
+.Pp
+To see exactly which locations are being used, pass the
+.Fl p
+or
+.Fl \-paths
+flag to
+.Nm .
+Note that this will not include game- or directory-specific
+configuration files.
+.Pp
+Configuration files are additive: first, the global configuration file is
+parsed.
+Next, the user's configuration file
+.Po
+such as
+.Pa $HOME/.config/garglk.ini
+.Pc
+is parsed, with all of its provided options replacing whatever was specified in
+the global configuration file.
+Finally, if there is a directory-specific and/or game-specific configuration
+file, their options will replace any existing options.
+Configuration files need not provide all options.
+This allows, for example, a game to select only the colors to be used, while
+respecing all of the user's other choices.
+.Sh AUTHORS
+.An "Tor Andersson"
+.An "Ben Cressey"
+.An "Chris Spiegel" Aq cspiegel@gmail.com

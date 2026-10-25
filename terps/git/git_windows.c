@@ -1,10 +1,12 @@
 // Startup code for Windows Git
 
+#ifdef _MSC_VER // For Visual C++, get rand_s()
+#define _CRT_RAND_S
+#endif
+
 #include "glk.h"
 #include "WinGlk.h"
 #include "git.h"
-
-#include <math.h>
 
 const char* gFilename = NULL;
 char gExePath[_MAX_PATH];
@@ -21,24 +23,24 @@ int winglk_startup_code(const char* cmdline)
     winglk_set_about_text("Windows Git "GIT_VERSION_STR);
     winglk_show_game_dialog();
 
-    if (GetModuleFileName(0,gExePath,_MAX_PATH) == 0)
+    if (GetModuleFileName(0,gExePath,sizeof gExePath) == 0)
         return 0;
     sep = strrchr(gExePath,'.');
     if (sep != 0)
     {
-        strcpy(sep,".chm");
+        strcpy_s(sep,(sizeof gExePath)-(sep-gExePath),".chm");
         winglk_set_help_file(gExePath);
     }
 
-    if (GetModuleFileName(0,gExePath,_MAX_PATH) == 0)
+    if (GetModuleFileName(0,gExePath,sizeof gExePath) == 0)
         return 0;
     sep = strrchr(gExePath,'.');
     if (sep != 0)
     {
-        static char* exts[5] = { ".blb",".blorb",".glb",".gblorb",".ulx" };
-        for (i = 0; i < 5; i++)
+        static char* exts[] = { ".blb",".blorb",".glb",".gblorb",".ulx" };
+        for (i = 0; i < sizeof exts / sizeof exts[0]; i++)
         {
-            strcpy(sep,exts[i]);
+            strcpy_s(sep,(sizeof gExePath)-(sep-gExePath),exts[i]);
             if (GetFileAttributes(gExePath) != INVALID_FILE_ATTRIBUTES)
             {
                 gFilename = gExePath;
@@ -64,10 +66,10 @@ int winglk_startup_code(const char* cmdline)
 #define CACHE_SIZE (256 * 1024)
 #define UNDO_SIZE (2 * 1024 * 1024)
 
-void fatalError (const char * s)
+void fatalError(const char* s)
 {
     MessageBox(0,s,"Git Fatal Error",MB_OK|MB_ICONERROR);
-    exit (1);
+    exit(1);
 }
 
 void glk_main()
@@ -103,13 +105,13 @@ void glk_main()
         CloseHandle(file);
 }
 
-float git_powf(float x, float y)
+glui32 native_random()
 {
-  if (x == 1.0f)
-    return 1.0f;
-  else if ((y == 0.0f) || (y == -0.0f))
-    return 1.0f;
-  else if ((x == -1.0f) && isinf(y))
-    return 1.0f;
-  return powf(x,y);
+#ifdef _MSC_VER
+    unsigned int value;
+    rand_s(&value);
+    return value;
+#else
+    return xo_random();
+#endif
 }

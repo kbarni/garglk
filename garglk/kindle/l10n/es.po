@@ -1,0 +1,62 @@
+# Spanish translation of the Kindle user interface of Gargoyle.
+msgid ""
+msgstr ""
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Close"
+msgstr "Cerrar"
+
+msgid "Cancel"
+msgstr "Cancelar"
+
+msgid "Quit"
+msgstr "Salir"
+
+msgid "Are you sure you want to quit? You will lose all unsaved progress!"
+msgstr "¿Seguro que quieres salir? ¡Perderás el progreso que no hayas guardado!"
+
+msgid "Save game"
+msgstr "Guardar partida"
+
+msgid "Restore game"
+msgstr "Cargar partida"
+
+msgid "Game list"
+msgstr "Lista de juegos"
+
+msgid "Go back to the game list? You will lose all unsaved progress!"
+msgstr "¿Volver a la lista de juegos? ¡Perderás el progreso que no hayas guardado!"
+
+msgid "Open"
+msgstr "Abrir"
+
+msgid "Restore"
+msgstr "Cargar"
+
+msgid "Save"
+msgstr "Guardar"
+
+msgid "Replace"
+msgstr "Reemplazar"
+
+msgid "\"%s\" already exists. Do you want to replace it?"
+msgstr "«%s» ya existe. ¿Quieres reemplazarlo?"
+
+msgid "This folder is empty"
+msgstr "Esta carpeta está vacía"
+
+msgid "Play"
+msgstr "Jugar"
+
+msgid "Download games"
+msgstr "Descargar juegos"
+
+msgid ""
+"The game downloader needs kTerm.\n"
+"Install it with ;kpm install kterm"
+msgstr ""
+"El descargador de juegos necesita kTerm.\n"
+"Instálalo con ;kpm install kterm"

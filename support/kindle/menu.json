@@ -1,0 +1,5 @@
+{
+	"items": [
+		{"name": "gargoyle", "priority": 0, "action": "./gargoyle.sh", "exitmenu": true}
+	]
+}

@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
  * USA
  */
 
@@ -640,10 +640,15 @@ static const int GMS_GRAPHICS_ANIMATION_WAIT = 2,
                  GMS_GRAPHICS_REPAINT_WAIT = 10;
 
 /* Pixel size multiplier for image size scaling. */
-static const int GMS_GRAPHICS_PIXEL = 2;
+static int gms_graphics_pixel = 2;
 
 /* Proportion of the display to use for graphics. */
-static const glui32 GMS_GRAPHICS_PROPORTION = 60;
+static glui32 gms_graphics_proportion = 60;
+
+/* Height, in pixels, of the graphics window. Takes precendence over
+ * gms_graphics_pixel. If 0, ignore.
+ */
+static glui32 gms_graphics_height_pixels = 0;
 
 /*
  * Border and shading control.  For cases where we can't detect the back-
@@ -723,11 +728,22 @@ gms_graphics_open (void)
 {
   if (!gms_graphics_window)
     {
-      gms_graphics_window = glk_window_open (gms_main_window,
-                                             winmethod_Above
-                                             | winmethod_Proportional,
-                                             GMS_GRAPHICS_PROPORTION,
-                                             wintype_Graphics, 0);
+      if (gms_graphics_height_pixels > 0)
+        {
+          gms_graphics_window = glk_window_open (gms_main_window,
+                                                winmethod_Above
+                                                | winmethod_Fixed,
+                                                gms_graphics_height_pixels,
+                                                wintype_Graphics, 0);
+        }
+      else
+        {
+          gms_graphics_window = glk_window_open (gms_main_window,
+                                                 winmethod_Above
+                                                 | winmethod_Proportional,
+                                                 gms_graphics_proportion,
+                                                 wintype_Graphics, 0);
+        }
     }
 
   return gms_graphics_window != NULL;
@@ -1001,8 +1017,8 @@ static int
 gms_graphics_compare_luminance (const void *void_first,
                                 const void *void_second)
 {
-  long first = *(long *) void_first;
-  long second = *(long *) void_second;
+  int first = *(int *) void_first;
+  int second = *(int *) void_second;
 
   return first > second ? 1 : second > first ? -1 : 0;
 }
@@ -1827,29 +1843,29 @@ break_y_max:
     }
 }
 
+#ifdef GARGLK
 static void
-gms_graphics_paint_everything (winid_t glk_window,
-			glui32 palette[],
-			type8 off_screen[],
-			int x_offset, int y_offset,
-			type16 width, type16 height)
+gms_graphics_paint_everything (winid_t glk_window, glui32 palette[],
+                              type8 off_screen[], int x_offset,
+                              int y_offset, type16 width, type16 height)
 {
-	type8		pixel;			/* Reference pixel color */
-	int		x, y;
+  type8 pixel; /* Reference pixel color */
+  int x, y;
 
-	for (y = 0; y < height; y++)
-	{
-	    for (x = 0; x < width; x ++)
-	    {
-		pixel = off_screen[ y * width + x ];
-		glk_window_fill_rect (glk_window,
-			palette[ pixel ],
-			x * GMS_GRAPHICS_PIXEL + x_offset,
-			y * GMS_GRAPHICS_PIXEL + y_offset,
-			GMS_GRAPHICS_PIXEL, GMS_GRAPHICS_PIXEL);
-	    }
-	}
+  for (y = 0; y < height; y++)
+    {
+      for (x = 0; x < width; x++)
+        {
+          pixel = off_screen[y * width + x];
+          glk_window_fill_rect (glk_window,
+                                palette[pixel],
+                                x * gms_graphics_pixel + x_offset,
+                                y * gms_graphics_pixel + y_offset,
+                                gms_graphics_pixel, gms_graphics_pixel);
+        }
+    }
 }
+#endif
 
 /*
  * gms_graphics_timeout()
@@ -1999,7 +2015,7 @@ gms_graphics_timeout (void)
        * window.
        */
       gms_graphics_position_picture (gms_graphics_window,
-                                     GMS_GRAPHICS_PIXEL,
+                                     gms_graphics_pixel,
                                      gms_graphics_width, gms_graphics_height,
                                      &x_offset, &y_offset);
 
@@ -2031,7 +2047,7 @@ gms_graphics_timeout (void)
       /* Clear the graphics window. */
       gms_graphics_clear_and_border (gms_graphics_window,
                                      x_offset, y_offset,
-                                     GMS_GRAPHICS_PIXEL,
+                                     gms_graphics_pixel,
                                      gms_graphics_width, gms_graphics_height);
 
       /* Start a fresh picture rendering pass. */
@@ -2100,7 +2116,7 @@ gms_graphics_timeout (void)
                                              palette, layers,
                                              off_screen, on_screen,
                                              x, y, x_offset, y_offset,
-                                             GMS_GRAPHICS_PIXEL,
+                                             gms_graphics_pixel,
                                              gms_graphics_width,
                                              gms_graphics_height);
 
@@ -2143,12 +2159,9 @@ gms_graphics_timeout (void)
   total_regions += regions;
 
 #else
-	gms_graphics_paint_everything
-	    (gms_graphics_window,
-	     palette, off_screen,
-	     x_offset, y_offset,
-	     gms_graphics_width,
-	     gms_graphics_height);
+  gms_graphics_paint_everything (gms_graphics_window, palette, off_screen,
+                                 x_offset, y_offset,
+                                 gms_graphics_width, gms_graphics_height);
 #endif
 
   /*
@@ -2544,7 +2557,6 @@ static void
 gms_status_update (void)
 {
   glui32 width, height;
-  int index;
   assert (gms_status_window);
 
   glk_window_get_size (gms_status_window, &width, &height);
@@ -2554,10 +2566,12 @@ gms_status_update (void)
       glk_window_move_cursor (gms_status_window, 0, 0);
       glk_set_window (gms_status_window);
 
-      glk_set_style(style_User1);
-      for (index = 0; index < width; index++)
+#ifdef GARGLK
+      glk_set_style (style_User1);
+      for (glui32 index = 0; index < width; index++)
         glk_put_char (' ');
       glk_window_move_cursor (gms_status_window, 1, 0);
+#endif
 
       if (gms_status_length > 0)
         {
@@ -4721,8 +4735,8 @@ gms_command_license (const char *argument)
 
   gms_normal_string ("You should have received a copy of the GNU General"
                       " Public License along with this program; if not, write"
-                      " to the Free Software Foundation, Inc., 51 Franklin"
-                      " Street, Fifth Floor, Boston, MA 02110-1301 USA\n\n");
+                      " to the Free Software Foundation, Inc., 59 Temple"
+                      " Place, Suite 330, Boston, MA  02111-1307 USA\n\n");
 
   gms_normal_string ("Please report any bugs, omissions, or misfeatures to ");
   gms_standout_string ("simon_baldwin@yahoo.com");
@@ -5213,7 +5227,7 @@ gms_expand_abbreviations (char *buffer, int size)
       memmove (command + strlen (expansion) - 1, command, strlen (command) + 1);
       memcpy (command, expansion, strlen (expansion));
 
-#if 0
+#ifndef GARGLK
       gms_standout_string ("[");
       gms_standout_char (abbreviation);
       gms_standout_string (" -> ");
@@ -5910,6 +5924,36 @@ gms_startup_code (int argc, char *argv[])
           gms_prompt_enabled = FALSE;
           continue;
         }
+      if (strcmp (argv[argv_index], "-sc") == 0)
+        {
+          char *endptr;
+          long scale = strtol(argv[++argv_index], &endptr, 10);
+          if (scale >= 1 && scale <= 8 && *endptr == 0)
+            {
+              gms_graphics_pixel = scale;
+            }
+          continue;
+        }
+      if (strcmp (argv[argv_index], "-gp") == 0)
+        {
+          char *endptr;
+          long proportion = strtol(argv[++argv_index], &endptr, 10);
+          if (proportion >= 1 && proportion <= 100 && *endptr == 0)
+            {
+              gms_graphics_proportion = proportion;
+            }
+          continue;
+        }
+      if (strcmp (argv[argv_index], "-gx") == 0)
+        {
+          char *endptr;
+          long pixels = strtol(argv[++argv_index], &endptr, 10);
+          if (pixels > 0 && *endptr == 0)
+            {
+              gms_graphics_height_pixels = pixels;
+            }
+          continue;
+        }
       return FALSE;
     }
 
@@ -5925,13 +5969,13 @@ gms_startup_code (int argc, char *argv[])
       gms_gamefile = argv[argv_index];
       gms_game_message = NULL;
 #ifdef GARGLK
-    {
       char *s;
       s = strrchr(gms_gamefile, '\\');
-      if (s) garglk_set_story_name(s+1);
+      if (s)
+        garglk_set_story_name(s+1);
       s = strrchr(gms_gamefile, '/');
-      if (s) garglk_set_story_name(s+1);
-    }
+      if (s)
+        garglk_set_story_name(s+1);
 #endif
     }
   else
@@ -6032,7 +6076,9 @@ gms_main (void)
     gms_graphics_enabled = FALSE;
 
   /* Try to create a one-line status window.  We can live without it. */
+#ifdef GARGLK
   glk_stylehint_set (wintype_TextGrid, style_User1, stylehint_ReverseColor, 1);
+#endif
   gms_status_window = glk_window_open (gms_main_window,
                                        winmethod_Above | winmethod_Fixed,
                                        1, wintype_TextGrid, 0);
@@ -6180,7 +6226,7 @@ glk_main (void)
 /*---------------------------------------------------------------------*/
 /*  Glk linkage relevant only to the UNIX platform                     */
 /*---------------------------------------------------------------------*/
-#ifdef TRUE
+#ifdef MAGNETIC_GLKUNIX
 
 #include "glkstart.h"
 
@@ -6200,6 +6246,8 @@ glkunix_argumentlist_t glkunix_arguments[] = {
    (char *) "-nx        Turn off picture animations"},
   {(char *) "-ne", glkunix_arg_NoValue,
    (char *) "-ne        Turn off additional interpreter prompt"},
+  {(char *) "-sc", glkunix_arg_ValueFollows,
+   (char *) "-sc        Scale pictures by integer value (1-8)"},
   {(char *) "", glkunix_arg_ValueCanFollow,
    (char *) "filename   game to run"},
   {NULL, glkunix_arg_End, NULL}
@@ -6220,8 +6268,8 @@ glkunix_startup_code (glkunix_startup_t * data)
   gms_startup_called = TRUE;
 
 #ifdef GARGLK
-  garglk_set_program_name("Magnetic 2.3");
-  garglk_set_program_info(
+  garglk_set_program_name ("Magnetic 2.3");
+  garglk_set_program_info (
       "Magnetic 2.3 by Niclas Karlsson, David Kinder,\n"
       "Stefan Meier, and Paul David Doherty.\n"
       "Glk port by Simon Baldwin.\n"
@@ -6230,12 +6278,13 @@ glkunix_startup_code (glkunix_startup_t * data)
 
   return gms_startup_code (data->argc, data->argv);
 }
-#endif /* _unix */
+#endif /* MAGNETIC_GLKUNIX */
 
 
 /*---------------------------------------------------------------------*/
 /*  Glk linkage relevant only to the Mac platform                      */
 /*---------------------------------------------------------------------*/
+#ifndef GARGLK
 #if TARGET_OS_MAC
 
 #include "macglk_startup.h"
@@ -6309,3 +6358,4 @@ macglk_startup_code (macglk_startup_t * data)
   return TRUE;
 }
 #endif /* TARGET_OS_MAC */
+#endif

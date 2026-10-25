@@ -1,14 +1,14 @@
+// vim: set ft=cpp:
+
 #ifndef ZTERP_BRANCH_H
 #define ZTERP_BRANCH_H
 
-#include <stdbool.h>
+void branch_if(bool do_branch);
 
-void branch_if(bool);
-
-void zjump(void);
-void zjz(void);
-void zje(void);
-void zjl(void);
-void zjg(void);
+void zjump();
+void zjz();
+void zje();
+void zjl();
+void zjg();
 
 #endif

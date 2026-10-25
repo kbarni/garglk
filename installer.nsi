@@ -2,11 +2,24 @@
 ; Gargoyle NSIS 2 installer script
 ;
 
+; The FontName plugin is ANSI
+Unicode false
+
+!include x64.nsh
+
 Name "Gargoyle"
-OutFile "gargoyle-2019.1-windows.exe"
-InstallDir $PROGRAMFILES\Gargoyle
 InstallDirRegKey HKLM "Software\Tor Andersson\Gargoyle\Install" "Directory"
 SetCompressor lzma
+
+!define /file VERSION "VERSION"
+
+!if "$%GARGOYLE_ARCH%" == "x86_64"
+    InstallDir $PROGRAMFILES64\Gargoyle
+    OutFile "gargoyle-${VERSION}-windows-x86_64.exe"
+!else
+    InstallDir $PROGRAMFILES\Gargoyle
+    OutFile "gargoyle-${VERSION}-windows-i686.exe"
+!endif
 
 ;
 ; The required plugins
@@ -16,6 +29,11 @@ SetCompressor lzma
 !include MultiUser.nsh
 !include MUI.nsh
 !include Unix2DOS.nsh
+!include WinMessages.nsh
+
+; From https://nsis.sourceforge.io/FontName_plug-in
+!include FontReg.nsh
+!include FontName.nsh
 
 ;
 ; The installer theme
@@ -59,18 +77,35 @@ Section "DoInstall"
 	; Elevate rights
     !insertmacro MULTIUSER_INIT
 
+    !if "$%GARGOYLE_ARCH%" == "x86_64"
+        SetRegView 64
+    !endif
+
     SetOutPath $INSTDIR
 
     File "build\dist\*.exe"
     File "build\dist\*.dll"
     File "licenses\*.txt"
+    File "fonts\*.ttf"
+    File "fonts\unifont*.otf"
     File "/oname=garglk.ini.tmp" "garglk\garglk.ini"
     Push "garglk.ini.tmp"
     Push "garglk.ini"
     Call unix2dos
 
+    CreateDirectory $INSTDIR\plugins\platforms
+    SetOutPath $INSTDIR\plugins\platforms
+    File "build\dist\plugins\platforms\*"
 
     WriteUninstaller "uninstall.exe"
+
+    ; CreateShortCut takes the shortcut's working directory from $OUTDIR,
+    ; which is still plugins\platforms from the SetOutPath above. Reset
+    ; it so that a Gargoyle started from the Start Menu gets the
+    ; installation directory as its working directory: that is the one
+    ; value it can recognize as "nobody chose this", which is what lets
+    ; it relocate to somewhere useful before opening a file dialog.
+    SetOutPath $INSTDIR
 
     !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
 	CreateDirectory "$SMPROGRAMS\$SMFOLDER"
@@ -118,7 +153,7 @@ Section "DoInstall"
     WriteRegStr HKCR ".saga" "" "Gargoyle.Story"
 
     WriteRegStr HKCR "Gargoyle.Story" "" "Interactive Fiction Story File"
-    WriteRegStr HKCR "Gargoyle.Story\DefaultIcon" "" "$INSTDIR\gargoyle.exe,1"
+    WriteRegStr HKCR "Gargoyle.Story\DefaultIcon" "" "$INSTDIR\gargoyle.exe,0"
     WriteRegStr HKCR "Gargoyle.Story\shell" "" "open"
     WriteRegStr HKCR "Gargoyle.Story\shell\open" "" "Play"
     WriteRegStr HKCR "Gargoyle.Story\shell\open\command" "" "$INSTDIR\gargoyle.exe $\"%1$\""
@@ -144,6 +179,11 @@ Section "Uninstall"
     Delete $INSTDIR\*.exe
     Delete $INSTDIR\*.dll
     Delete $INSTDIR\*.txt
+    Delete $INSTDIR\*.ttf
+    Delete $INSTDIR\unifont*.otf
+    Delete $INSTDIR\plugins\platforms\*.*
+    RMDir $INSTDIR\plugins\platforms
+    RMDir $INSTDIR\plugins
 
     ; Remove shortcuts, if any
     !insertmacro MUI_STARTMENU_GETFOLDER Application $R0
@@ -152,5 +192,27 @@ Section "Uninstall"
     RMDir "$SMPROGRAMS\Gargoyle"
     RMDir "$INSTDIR"
 
+    Delete "$FONTS\Gargoyle-Mono-Bold-Italic.ttf"
+    Delete "$FONTS\Gargoyle-Mono-Bold.ttf"
+    Delete "$FONTS\Gargoyle-Mono-Italic.ttf"
+    Delete "$FONTS\Gargoyle-Mono.ttf"
+    Delete "$FONTS\Gargoyle-Serif-Bold-Italic.ttf"
+    Delete "$FONTS\Gargoyle-Serif-Bold.ttf"
+    Delete "$FONTS\Gargoyle-Serif-Italic.ttf"
+    Delete "$FONTS\Gargoyle-Serif.ttf"
 SectionEnd
 
+Section "Fonts"
+    StrCpy $FONT_DIR $FONTS
+
+    !insertmacro InstallTTFFont "fonts\Gargoyle-Mono-Bold-Italic.ttf"
+    !insertmacro InstallTTFFont "fonts\Gargoyle-Mono-Bold.ttf"
+    !insertmacro InstallTTFFont "fonts\Gargoyle-Mono-Italic.ttf"
+    !insertmacro InstallTTFFont "fonts\Gargoyle-Mono.ttf"
+    !insertmacro InstallTTFFont "fonts\Gargoyle-Serif-Bold-Italic.ttf"
+    !insertmacro InstallTTFFont "fonts\Gargoyle-Serif-Bold.ttf"
+    !insertmacro InstallTTFFont "fonts\Gargoyle-Serif-Italic.ttf"
+    !insertmacro InstallTTFFont "fonts\Gargoyle-Serif.ttf"
+
+    SendMessage ${HWND_BROADCAST} ${WM_FONTCHANGE} 0 0 /TIMEOUT=5000
+SectionEnd

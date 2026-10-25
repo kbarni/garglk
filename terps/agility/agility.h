@@ -12,7 +12,7 @@
 
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  
+    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  
     USA 
 */
 /*                                                        */
@@ -40,7 +40,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <limits.h>
+
+/* For strcasecmp() and strncasecemp(). */
+#include <strings.h>
 
 /* Platform-specific configuration info */
 #include "config.h"
@@ -67,36 +69,13 @@
 #endif
 
 /* General data types */
-
-#if UCHAR_MAX==0xff
 typedef unsigned char uchar;
 typedef signed char schar;
-#else
-#error "Can't find an 8-bit integer type"
-#endif
-
-/* Should be a 16+-bit signed numeric type */
-/* For technical reasons, it must be big enough to
-   hold a value of type word (see below) */
-#if SHRT_MAX==0x7fff
-typedef short integer;
-#elif INT_MAX==0x7fff
-typedef int integer;
-#else
-#error "Can't find a 16-bit integer type"
-#endif
-
-/* Should be a 32+-bit unsigned numeric type */
-#if INT_MAX==0x7fffffff
-typedef unsigned int int32;
-typedef unsigned int uint32;
-#elif LONG_MAX==0x7fffffff
-typedef unsigned long int32;
+typedef short integer;  /* Should be a 16+-bit signed numeric type */
+                        /* For technical reasons, it must be big enough to
+			   hold a value of type word (see below) */
+typedef unsigned long int32;  /* Should be a 32+-bit unsigned numeric type */
 typedef unsigned long uint32;
-#else
-#error "Can't find a 32-bit integer type"
-#endif
-
 typedef uchar rbool;
 
 #define WORD_LENG 25
@@ -579,7 +558,7 @@ global integer exitmsg_base; /* Number added to messages used as
 
 global integer start_room, treas_room, resurrect_room, max_lives;
 global long max_score;
-global integer startup_time, delta_time;
+global integer start_time, delta_time;
 
 /* ver contains the size of the game, aver indicates its version */
 /*  See the #define's below for details */
@@ -612,7 +591,7 @@ global flagdef_rec *flagtable;
 
 /* Output strings associated with various property values. */
 /*    See propdef_rec */
-global const char **propstr;
+global char **propstr;
 global long propstr_size;
 
 global tline *userstr; /*[MAX_USTR];*/
@@ -912,6 +891,7 @@ const char *get_objattr_str(int dtype,int id,long val);
 const opdef *get_opdef(integer op);
 char *objname(int);
 void sort_cmd(void);
+void cmds_syns_canon(void);
 
 void agtwarn(const char*,int elev);
 void agtnwarn(const char*,int,int elev);

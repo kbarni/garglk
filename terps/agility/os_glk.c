@@ -14,12 +14,12 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
  * USA
  */
 
 /*
- * Glk interface for AGiliTy 1.1.1.1
+ * Glk interface for AGiliTy 1.1.1
  * -------------------------------
  *
  * This module contains the the Glk porting layer for AGiliTy.  It
@@ -73,7 +73,6 @@
 # else
 #  include <unistd.h>
 #  include <fcntl.h>
-#  include <sys/time.h>
 #  include <sys/types.h>
 # endif
 #else
@@ -84,6 +83,10 @@
 #include "interp.h"
 
 #include "glk.h"
+
+#ifdef GARGLK
+#include "glkstart.h"
+#endif
 
 /*
  * True and false definitions -- usually defined in glkstart.h, but we need
@@ -812,7 +815,7 @@ agt_statline (const char *cp_string)
 
   free (gagt_status_buffer);
   gagt_status_buffer = gagt_malloc (strlen (cp_string) + 1);
-  gagt_cp_to_iso (cp_string, gagt_status_buffer);
+  gagt_cp_to_iso ((const unsigned char *)cp_string, (unsigned char *)gagt_status_buffer);
 
   gagt_debug ("agt_statline", "string='%s'", cp_string);
 }
@@ -926,7 +929,7 @@ gagt_status_update (void)
            * We don't (yet) have a status line.  Perhaps we're at the
            * very start of a game.  Print a standard message.
            */
-          glk_put_string ("Glk AGiliTy version 1.1.1.1");
+          glk_put_string ("Glk AGiliTy version 1.1.1");
         }
 
       glk_set_window (gagt_main_window);
@@ -1821,7 +1824,7 @@ agt_puts (const char *cp_string)
        * add string and packed text attributes to the current line buffer.
        */
       iso_string = gagt_malloc (length + 1);
-      gagt_cp_to_iso (cp_string, iso_string);
+      gagt_cp_to_iso ((const unsigned char *)cp_string, (unsigned char *)iso_string);
       packed = gagt_pack_current_attributes ();
       gagt_string_append (&gagt_current_buffer, iso_string, packed);
 
@@ -2877,7 +2880,7 @@ typedef const struct gagt_special_s
 /*
  * Table of special AGiliTy interpreter strings and paragraphs -- where one
  * appears in game output, we'll print out its replacement instead.  Be
- * warned; these strings are VERY specific to AGiliTy 1.1.1.1, and are extre-
+ * warned; these strings are VERY specific to AGiliTy 1.1.1, and are extre-
  * mely likely to change with any future interpreter releases.  They also
  * omit initializers with abandon, expecting the compiler to default these
  * to NULL/zero.  Replacement strings embed style encoding as |x, where x is
@@ -2893,22 +2896,22 @@ static gagt_special_t GAGT_SPECIALS[] = {
   /* Normal version of initial interpreter information block. */
   {4,
    {"This game is being executed by",
-    "AGiliTy: The (Mostly) Universal AGT Interpreter  version 1.1.1.1",
+    "AGiliTy: The (Mostly) Universal AGT Interpreter  version 1.1.2",
     "Copyright (C) 1996-99,2001 by Robert Masenten",
     "Glk version"},
    "This game is being executed by:\n\n"
-   "    |SAGiliTy, The (Mostly) Universal AGT Interpreter, Version 1.1.1.1|N\n"
+   "    |SAGiliTy, The (Mostly) Universal AGT Interpreter, Version 1.1.2|N\n"
    "    |ECopyright (C) 1996-1999,2001 by Robert Masenten|N\n"
    "    |EGlk version|N\n"},
 
   /* AGiliTy "information" screen header block. */
   {5,
    {"AGiliTy",
-    "The (Mostly) Universal AGT Interpreter, version 1.1.1.1",
+    "The (Mostly) Universal AGT Interpreter, version 1.1.2",
     "Copyright (C) 1996-1999,2001 by Robert Masenten",
     "[Glk version]",
     "-----------------------------------------------------------"},
-   "|SAGiliTy, The (Mostly) Universal AGT Interpreter, Version 1.1.1.1|N\n"
+   "|SAGiliTy, The (Mostly) Universal AGT Interpreter, Version 1.1.2|N\n"
    "|ECopyright (C) 1996-1999,2001 by Robert Masenten|N\n"
    "|EGlk version|N\n"},
 
@@ -2919,20 +2922,20 @@ static gagt_special_t GAGT_SPECIALS[] = {
 
   /* Alternative, shrunken version of initial interpreter information block. */
   {2,
-   {"Being run by AGiliTy  version 1.1.1.1, Copyright (C) 1996-99,2001"
+   {"Being run by AGiliTy  version 1.1.2, Copyright (C) 1996-99,2001"
       " Robert Masenten",
     "Glk version"},
    "This game is being executed by:\n\n"
-   "    |SAGiliTy, The (Mostly) Universal AGT Interpreter, Version 1.1.1.1|N\n"
+   "    |SAGiliTy, The (Mostly) Universal AGT Interpreter, Version 1.1.2|N\n"
    "    |ECopyright (C) 1996-1999,2001 by Robert Masenten|N\n"
    "    |EGlk version|N\n"},
 
   /* Alternative, minimal version of initial interpreter information block. */
   {1,
-   {"Being run by AGiliTy  version 1.1.1.1, Copyright (C) 1996-99,2001"
+   {"Being run by AGiliTy  version 1.1.2, Copyright (C) 1996-99,2001"
       " Robert Masenten"},
    "This game is being executed by:\n\n"
-   "    |SAGiliTy, The (Mostly) Universal AGT Interpreter, Version 1.1.1.1|N\n"
+   "    |SAGiliTy, The (Mostly) Universal AGT Interpreter, Version 1.1.2|N\n"
    "    |ECopyright (C) 1996-1999,2001 by Robert Masenten|N\n"
    "    |EGlk version|N\n"},
 
@@ -2945,11 +2948,11 @@ static gagt_special_t GAGT_SPECIALS[] = {
 
   /* Three-line version of initial interpreter information block. */
   {3,
-   {"AGiliTy: The (Mostly) Universal AGT Interpreter  version 1.1.1.1",
+   {"AGiliTy: The (Mostly) Universal AGT Interpreter  version 1.1.2",
     "Copyright (C) 1996-99,2001 by Robert Masenten",
     "Glk version"},
    "This game is being executed by:\n\n"
-   "    |SAGiliTy, The (Mostly) Universal AGT Interpreter, Version 1.1.1.1|N\n"
+   "    |SAGiliTy, The (Mostly) Universal AGT Interpreter, Version 1.1.2|N\n"
    "    |ECopyright (C) 1996-1999,2001 by Robert Masenten|N\n"
    "    |EGlk version|N\n"},
 
@@ -3002,7 +3005,7 @@ gagt_compare_special_line (const char *compare, const gagt_lineref_t line)
    */
   return strlen (compare) == line->real_length
          && gagt_strncasecmp (compare,
-                              line->buffer.data + line->indent,
+                              (char *)line->buffer.data + line->indent,
                               line->real_length) == 0;
 }
 
@@ -3338,7 +3341,7 @@ gagt_display_line (const gagt_lineref_t line, glui32 current_style,
     }
 
   /* Display this line segment. */
-  set_style = gagt_display_text_element (line->buffer.data + start,
+  set_style = gagt_display_text_element ((const char *)line->buffer.data + start,
                                          line->buffer.attributes + start,
                                          length, current_style, fixed_width);
 
@@ -3487,7 +3490,7 @@ gagt_display_auto (void)
 
   /* Output any help hint and unterminated line from the line buffer. */
   style = gagt_display_provide_help_hint (style);
-  style = gagt_display_text_element (gagt_current_buffer.data,
+  style = gagt_display_text_element ((char *)gagt_current_buffer.data,
                                      gagt_current_buffer.attributes,
                                      gagt_current_buffer.length, style, FALSE);
 }
@@ -3536,7 +3539,7 @@ gagt_display_manual (int fixed_width)
 
   /* Output any help hint and unterminated line from the line buffer. */
   style = gagt_display_provide_help_hint (style);
-  style = gagt_display_text_element (gagt_current_buffer.data,
+  style = gagt_display_text_element ((char *)gagt_current_buffer.data,
                                      gagt_current_buffer.attributes,
                                      gagt_current_buffer.length,
                                      style, fixed_width);
@@ -3563,11 +3566,11 @@ gagt_display_debug (void)
 
       paragraph = line->paragraph;
       sprintf (buffer,
-               "%2d:%2d->%2ld A=%-3d L=%-2d I=%-2d O=%-2d R=%-2d %c%c| ",
+               "%2d:%2d->%2lld A=%-3d L=%-2d I=%-2d O=%-2d R=%-2d %c%c| ",
                paragraph ? paragraph->id + 1 : 0,
                paragraph ? paragraph->line_count : 0,
-               paragraph && paragraph->special
-                   ? paragraph->special - GAGT_SPECIALS + 1 : 0,
+               (long long)(paragraph && paragraph->special
+                   ? paragraph->special - GAGT_SPECIALS + 1 : 0),
                line->buffer.allocation, line->buffer.length,
                line->indent, line->outdent,
                line->real_length,
@@ -3579,7 +3582,7 @@ gagt_display_debug (void)
                  line->font_hint == HINT_FIXED_WIDTH ? 'F' : '_');
       glk_put_string (buffer);
 
-      glk_put_buffer (line->buffer.data, line->buffer.length);
+      glk_put_buffer ((char *)line->buffer.data, line->buffer.length);
       glk_put_char ('\n');
     }
 
@@ -3591,7 +3594,7 @@ gagt_display_debug (void)
                gagt_help_requested ? "HR" : "__");
       glk_put_string (buffer);
 
-      glk_put_buffer (gagt_current_buffer.data, gagt_current_buffer.length);
+      glk_put_buffer ((char *)gagt_current_buffer.data, gagt_current_buffer.length);
     }
 
   gagt_help_requested = FALSE;
@@ -4763,8 +4766,8 @@ gagt_command_license (const char *argument)
 
   gagt_normal_string ("You should have received a copy of the GNU General"
                       " Public License along with this program; if not, write"
-                      " to the Free Software Foundation, Inc., 51 Franklin"
-                      " Street, Fifth Floor, Boston, MA 02110-1301 USA\n\n");
+                      " to the Free Software Foundation, Inc., 59 Temple"
+                      " Place, Suite 330, Boston, MA  02111-1307 USA\n\n");
 
   gagt_normal_string ("Please report any bugs, omissions, or misfeatures to ");
   gagt_standout_string ("simon_baldwin@yahoo.com");
@@ -5280,7 +5283,7 @@ agt_input (int in_type)
            * Convert the string from Glk's ISO 8859 Latin-1 to IBM cp 437,
            * add to any script, and return it.
            */
-          gagt_iso_to_cp (buffer, buffer);
+          gagt_iso_to_cp ((unsigned char *)buffer, (unsigned char *)buffer);
           if (script_on)
             textputs (scriptfile, buffer);
           return buffer;
@@ -5369,7 +5372,7 @@ agt_input (int in_type)
   /*
    * Convert from Glk's ISO 8859 Latin-1 to IBM cp 437, and add to any script.
    */
-  gagt_iso_to_cp (buffer, buffer);
+  gagt_iso_to_cp ((unsigned char *)buffer, (unsigned char *)buffer);
   if (script_on)
     textputs (scriptfile, buffer);
 
@@ -5437,7 +5440,7 @@ agt_getkey (rbool echo_char)
            * Convert from Glk's ISO 8859 Latin-1 to IBM cp 437, add to any
            * script, and return the character.
            */
-          gagt_iso_to_cp (buffer, buffer);
+          gagt_iso_to_cp ((unsigned char *)buffer, (unsigned char *)buffer);
           if (script_on)
             textputs (scriptfile, buffer);
           return buffer[0];
@@ -5489,7 +5492,7 @@ agt_getkey (rbool echo_char)
    * Convert from Glk's ISO 8859 Latin-1 to IBM cp 437, and add to any
    * script.
    */
-  gagt_iso_to_cp (buffer, buffer);
+  gagt_iso_to_cp ((unsigned char *)buffer, (unsigned char *)buffer);
   if (script_on)
     textputs (scriptfile, buffer);
 
@@ -5788,9 +5791,9 @@ gagt_confirm (const char *prompt)
  * It may also work for you, but if it doesn't, or if your system lacks
  * things like dup or fdopen, define GLK_ANSI_ONLY and use the safe version.
  *
- * If GARGLK is used, non-ansi version calls garglk_fileref_get_name()
- * instead, and opens a file the highly portable way, but still with a
- * Glkily nice prompt dialog.
+ * If GLKUNIX_FILEREF_GET_FILENAME is defined, non-ansi version calls
+ * glkunix_fileref_get_filename() instead, and opens a file the highly
+ * portable way, but still with a Glkily nice prompt dialog.
  */
 #ifdef GLK_ANSI_ONLY
 static genfile
@@ -5922,8 +5925,8 @@ gagt_get_user_file (glui32 usage, glui32 fmode, const char *fdtype)
    * underlying file descriptor or FILE* from a Glk stream either. :-(
    */
 
-#ifdef GARGLK
-  retfile = fopen(garglk_fileref_get_name(fileref), fdtype);
+#ifdef GLKUNIX_FILEREF_GET_FILENAME
+  retfile = fopen(glkunix_fileref_get_filename(fileref), fdtype);
 #else
 
   /* So, start by dup()'ing the first file descriptor we can, ... */
@@ -5968,7 +5971,7 @@ gagt_get_user_file (glui32 usage, glui32 fmode, const char *fdtype)
   retfile = fdopen (retfd, fdtype);
   if (!retfile)
     return badfile (fSAV);
-#endif /* GARGLK */
+#endif /* GLKUNIX_FILEREF_GET_FILENAME */
 
   /*
    * The result of all of this should now be that retfile is a FILE* wrapper
@@ -6726,9 +6729,9 @@ glkunix_startup_code (glkunix_startup_t * data)
   gagt_startup_called = TRUE;
 
 #ifdef GARGLK
-  garglk_set_program_name("Agility 1.1.1.1");
+  garglk_set_program_name("Agility 1.1.2");
   garglk_set_program_info(
-                  "AGiliTy 1.1.1.1 by Robert Masenten\n"
+                  "AGiliTy 1.1.2 by Robert Masenten\n"
                   "Glk port by Simon Baldwin\n"
   );
 #endif /* GARGLK */
@@ -6741,6 +6744,7 @@ glkunix_startup_code (glkunix_startup_t * data)
 /*---------------------------------------------------------------------*/
 /*  Glk linkage relevant only to the Mac platform                      */
 /*---------------------------------------------------------------------*/
+#ifndef GARGLK
 #if TARGET_OS_MAC
 
 #include "macglk_startup.h"
@@ -6814,3 +6818,4 @@ macglk_startup_code (macglk_startup_t * data)
   return TRUE;
 }
 #endif /* TARGET_OS_MAC */
+#endif

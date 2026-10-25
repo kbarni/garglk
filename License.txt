@@ -10,36 +10,31 @@ Alan is copyright (c) Thomas Nilsson. It is released under the terms of the Arti
 
 Bocfel is copyright (c) Chris Spiegel. It is released under the terms of the GNU General Public License.
 
-Frotz is copyright (c) Stefan Jokisch. It is released under the terms of the GNU General Public License.
-
-Geas is copyright (c) Mark Tilford and David Jones. It is released under the terms of the GNU General Public License.
+The FrankenDrift Glk frontend is copyright (c) Adrian Welcker. It is released under the terms of the MIT license.
+ADRIFT 5 (part of FrankenDrift) is copyright (c) Campbell Wild. It is released under the terms of the 3-Clause BSD license.
 
 Git is copyright (c) Iain Merrick. It is released under the terms of the MIT License.
 
-Glulxe is copyright (c) Andrew Plotkin.
+Glulxe is copyright (c) Andrew Plotkin. It is released under the terms of the MIT License.
 
 Hugo is copyright (c) Kent Tessman. It is released with permission under the terms of the Simplified 2-Clause BSD license.
 
-JACL is copyright (c) Stuart Allen.  It is released under the terms of the GNU General Public License.
+JACL is copyright (c) Stuart Allen. It is released under the terms of the GNU General Public License.
 
 Level 9 is copyright (c) Glen Summers, David Kinder, Alan Staniforth, Simon Baldwin and Dieter Baron. It is released under the terms of the GNU General Public License.
 
 Magnetic is copyright (c) Niclas Karlsson, David Kinder, Stefan Meier and Paul David Doherty. It is released under the terms of the GNU General Public License.
 
-Nitfol is copyright (c) Evin Robertson. It is released under the terms of the GNU General Public License.
-
 SCARE is copyright (c) Simon Baldwin. It is released under the terms of the GNU General Public License.
+
+SCARIER is copyright (c) Simon Baldwin, Mark J. Tilford and Petter Sjolund. It is released under the terms of the GNU General Public License.
 
 ScottFree is copyright (c) Alan Cox. It is released under the terms of the GNU General Public License.
 
 TADS is copyright (c) Michael J. Roberts. It is released under the terms of the GNU General Public License.
 
-The Linux Libertine fonts are copyright (c) Philipp H. Poll. They are released under the terms of the SIL Open Font License.
+The Go Mono fonts (Gargoyle Mono) are copyright (c) 2016 Bigelow & Holmes Inc. They are released under the terms of the 3-clause BSD license.
 
-The Liberation fonts are copyright (c) Red Hat, Inc. They are released under the terms of the Liberation License.
-
-The Noto Serif fonts are copyright (c) 2012, Google Inc. They are released under the terms of the SIL Open Font License (OFL), version 1.1.
-
-The Go Mono fonts are copyright (c) 2016 Bigelow & Holmes Inc. They are released under the terms of the 3-clause BSD license.
+The Charis SIL fonts (Gargoyle Serif) are copyright (c) 1997-2014 SIL International. They are released under the terms of the SIL Open Font License version 1.1.
 
 The authors assume no liability for damages or loss of revenue resulting from the use of any of the software herein. The software is supplied "as is" and carries no warranty, actual or implied. 

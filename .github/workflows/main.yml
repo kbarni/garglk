@@ -1,0 +1,60 @@
+name: Main build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        compiler:
+          - { cc: "gcc-9", cxx: "g++-9" }
+
+    runs-on: ubuntu-latest
+    container:
+      image: amd64/ubuntu:24.04
+
+    env:
+      CC: ${{ matrix.compiler.cc }}
+      CXX: ${{ matrix.compiler.cxx }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - run: apt update
+
+      - name: Install deps
+        run: DEBIAN_FRONTEND=noninteractive apt install -y
+          build-essential
+          cmake
+          g++-9
+          gcc-9
+          git
+          grep
+          libfluidsynth-dev
+          libfmt-dev
+          libfontconfig1-dev
+          libfreetype-dev
+          libmpg123-dev
+          libopenmpt-dev
+          libsndfile-dev
+          libspeechd-dev
+          libturbojpeg0-dev
+          qt6-base-dev
+          qt6-base-dev-tools
+          qt6-multimedia-dev
+
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DSOUND=QT -DQT_VERSION=6
+
+      - name: Build
+        run: |
+          cd build
+          make -j`nproc`
+          make install DESTDIR=/tmp/gargoyle

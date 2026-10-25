@@ -1,0 +1,60 @@
+# Translations of the Kindle user interface of Gargoyle.
+# Copy this file to <language>.po (for example de.po or pt_BR.po) and fill in the msgstr lines.
+msgid ""
+msgstr ""
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Close"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Quit"
+msgstr ""
+
+msgid "Are you sure you want to quit? You will lose all unsaved progress!"
+msgstr ""
+
+msgid "Save game"
+msgstr ""
+
+msgid "Restore game"
+msgstr ""
+
+msgid "Game list"
+msgstr ""
+
+msgid "Go back to the game list? You will lose all unsaved progress!"
+msgstr ""
+
+msgid "Open"
+msgstr ""
+
+msgid "Restore"
+msgstr ""
+
+msgid "Save"
+msgstr ""
+
+msgid "Replace"
+msgstr ""
+
+msgid "\"%s\" already exists. Do you want to replace it?"
+msgstr ""
+
+msgid "This folder is empty"
+msgstr ""
+
+msgid "Play"
+msgstr ""
+
+msgid "Download games"
+msgstr ""
+
+msgid ""
+"The game downloader needs kTerm.\n"
+"Install it with ;kpm install kterm"
+msgstr ""

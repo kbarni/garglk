@@ -1,2 +1,0 @@
-<eventscript>
-<eof>

@@ -3,7 +3,7 @@
 * Magnetic - Magnetic Scrolls Interpreter.
 *
 * Written by Niclas Karlsson <nkarlsso@abo.fi>,
-*            David Kinder <davidk.kinder@virgin.net>,
+*            David Kinder <davidk@davidkinder.co.uk>,
 *            Stefan Meier <Stefan.Meier@if-legends.org> and
 *            Paul David Doherty <pdd@if-legends.org>
 *
@@ -21,7 +21,7 @@
 *
 *     You should have received a copy of the GNU General Public License
 *     along with this program; if not, write to the Free Software
-*     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+*     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111, USA.
 *
 \****************************************************************************/
 
@@ -35,34 +35,16 @@
 *       correct number of bits on your system !!!
 \*****************************************************************************/
 
-#include <limits.h>
+#include <stdint.h>
 
-#if UCHAR_MAX==0xff
-typedef unsigned char type8;
-typedef signed char   type8s;
-#else
-#error "Can't find an 8-bit integer type"
-#endif
+typedef uint8_t type8;
+typedef int8_t type8s;
 
-#if SHRT_MAX==0x7fff
-typedef unsigned short type16;
-typedef signed   short type16s;
-#elif INT_MAX==0x7fff
-typedef unsigned int type16;
-typedef signed   int type16s;
-#else
-#error "Can't find a 16-bit integer type"
-#endif
+typedef uint16_t type16;
+typedef int16_t type16s;
 
-#if INT_MAX==0x7fffffff
-typedef unsigned int type32;
-typedef signed   int type32s;
-#elif LONG_MAX==0x7fffffff
-typedef unsigned long type32;
-typedef signed   long type32s;
-#else
-#error "Can't find a 32-bit integer type"
-#endif
+typedef uint32_t type32;
+typedef int32_t type32s;
 
 /****************************************************************************\
 * Compile time switches 

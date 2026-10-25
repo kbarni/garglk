@@ -1,0 +1,39 @@
+name: macOS (DMG)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Update brew
+        run: brew update
+
+      - name: Install packages
+        run: brew install fmt jpeg-turbo pkg-config sdl3 fluid-synth libopenmpt libsndfile libvorbis mpg123
+
+      - name: Build
+        run: |
+          echo $(date +"%Y%m%d").$(echo $GITHUB_SHA | cut -b 1-7) > VERSION
+          sh gargoyle_osx.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Gargoyle-${{ matrix.arch }}.dmg
+          path: gargoyle*.dmg

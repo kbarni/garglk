@@ -3,10 +3,7 @@
  *   
  *   This file depends on treaty_builder.h
  *   
- * This file has been released into the public domain by its author.
-* The author waives all of his rights to the work
-* worldwide under copyright law to the maximum extent allowed by law
-* , but note that any changes to this file may
+ *   This file is public domain, but note that any changes to this file may
  *   render it noncompliant with the Treaty of Babel
  *   
  *   Modified
@@ -356,22 +353,30 @@ static void nextc(const char **p, int32 *len)
 {
     /* skip the first byte */
     if (*len != 0)
-        ++*p, --*len;
-
+    {
+        ++*p;
+        --*len;
+    }
     /* skip continuation bytes */
     while (*len != 0 && (**p & 0xC0) == 0x80)
-        ++*p, --*len;
+    {
+        ++*p;
+        --*len;
+    }
 }
 
 /* skip to the previous utf-8 character */
 static void prevc(const char **p, int32 *len)
 {
     /* move back one byte */
-    --*p, ++*len;
+    --*p; ++*len;
 
     /* keep skipping as long as we're looking at continuation characters */
     while ((**p & 0xC0) == 0x80)
-        --*p, ++*len;
+    {
+        --*p;
+        ++*len;
+    }
 }
 
 /*
@@ -540,17 +545,20 @@ static void write_ifiction_pcdata(synthctx *ctx, const char *p, size_t len,
         {
         case '<':
             write_ifiction_z(ctx, "&lt;");
-            ++p, --len;
+            ++p;
+            --len;
             break;
 
         case '>':
             write_ifiction_z(ctx, "&gt;");
-            ++p, --len;
+            ++p;
+            --len;
             break;
 
         case '&':
             write_ifiction_z(ctx, "&amp;");
-            ++p, --len;
+            ++p;
+            --len;
             break;
 
         case '\\':
@@ -732,8 +740,10 @@ static int scan_author_name(const char **p, size_t *len,
 
             /* skip the bracket */
             if (*len != 0)
-                ++*p, --*len;
-
+            {
+                ++*p;
+                --*len;
+            }
             /* skip whitespace */
             for ( ; *len != 0 && u_ishspace(**p) ; ++*p, --*len) ;
 
@@ -750,8 +760,10 @@ static int scan_author_name(const char **p, size_t *len,
 
         /* if we're at a semicolon, skip it */
         if (*len != 0 && **p == ';')
-            ++*p, --*len;
-
+        {
+            ++*p;
+            --*len;
+        }
         /* 
          *   if we found a non-empty name, return it; otherwise, continue on
          *   to the next semicolon section 
@@ -819,6 +831,10 @@ static int32 synth_ifiction(valinfo *vals, int tads_version,
         ifid_val = default_ifid;
         ifid_len = strlen(default_ifid);
     }
+    else
+    {
+        return NO_REPLY_RV;
+    }
 
     /* write the header, and start the <identification> section */
     write_ifiction_z(
@@ -860,7 +876,10 @@ static int32 synth_ifiction(valinfo *vals, int tads_version,
 
         /* skip the comma */
         if (rem != 0 && *p == ',')
-            ++p, --rem;
+        {
+            ++p;
+            --rem;
+        }
     }
 
     /* add the format information */
@@ -1003,7 +1022,10 @@ static int32 synth_ifiction(valinfo *vals, int tads_version,
                  *   of string, we're done 
                  */
                 if (rem != 0)
-                    ++p, --rem;
+                {
+                    ++p;
+                    --rem;
+                }
                 else
                     break;
             }
@@ -1133,7 +1155,10 @@ static valinfo *parse_game_info(const char *ptr, int32 len)
 
         /* skip any leading whitespace */
         while (rem != 0 && u_isspace(*p))
-            ++p, --rem;
+        {
+            ++p;
+            --rem;
+        }
 
         /* if the line starts with '#', it's a comment, so skip it */
         if (rem != 0 && *p == '#')
@@ -1933,5 +1958,4 @@ void main(int argc, char **argv)
 }
 
 
-#endif //TADS_TEST
-
+#endif /* TADS_TEST */

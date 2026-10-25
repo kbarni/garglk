@@ -1,0 +1,57 @@
+name: Fedora packages
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Fedora ${{ matrix.version }} package
+    strategy:
+      matrix:
+        version:
+          - 40
+          - 41
+          - 42
+
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:${{ matrix.version}}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Update packages
+        run: yum -y update
+
+      - name: Install packages
+        run: yum -y install
+          cmake
+          dotnet-sdk-8.0
+          fluidsynth-devel
+          fmt-devel
+          fontconfig-devel
+          freetype-devel
+          libjpeg-turbo-devel
+          libmpg123-devel
+          libopenmpt-devel
+          libpng-devel
+          libsndfile-devel
+          qt6-qtbase-devel
+          qt6-qtmultimedia-devel
+          rpm-build
+          turbojpeg-devel
+
+      - name: Build Fedora package
+        run: |
+          echo $(date +"%Y%m%d").$(echo $GITHUB_SHA | cut -b 1-7) > VERSION
+          ./gargoyle-buildrpm.sh
+
+      - name: Upload RPM
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: Gargoyle-Fedora-${{ matrix.version }}
+          path: ~/rpm_factory/RPMS/x86_64/*.rpm

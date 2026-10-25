@@ -1,0 +1,5 @@
+# Settings of Bocfel, the Z-machine interpreter; see bocfel(6) for every option.
+
+# Z-code games carry on where they were left, as books do on the Kindle,
+# even after the device was restarted.
+autosave = 1
